@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "815690586850",
+    "project_id": "letterwars-f8384",
+    "storage_bucket": "letterwars-f8384.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:815690586850:android:dbd5f453fcd5a008fb1cbb",
+        "android_client_info": {
+          "package_name": "com.example.letterwars"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD10hXCsab2J1BuAiv2_SAVMWqHXkjtRZQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
