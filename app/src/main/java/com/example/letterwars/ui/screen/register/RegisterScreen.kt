@@ -23,24 +23,32 @@ import com.example.letterwars.ui.screen.common.FloatingLettersBackground
 fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = viewModel()) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") } // Added confirm password field
+    var confirmPassword by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
-    var ageText by remember { mutableStateOf("") }
 
-    // State for password validation error
+    var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
+    var usernameError by remember { mutableStateOf<String?>(null) }
 
     val status by viewModel.uiState.collectAsState()
+
+    fun isValidEmail(email: String): Boolean {
+        val regex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}\$")
+        return regex.matches(email)
+    }
+
+    fun isValidPassword(password: String): Boolean {
+        val regex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}\$")
+        return regex.matches(password)
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Floating letters background
         FloatingLettersBackground()
 
-        // Registration form
         Card(
             modifier = Modifier
                 .padding(24.dp)
@@ -68,7 +76,10 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
 
                 OutlinedTextField(
                     value = email,
-                    onValueChange = { email = it },
+                    onValueChange = {
+                        email = it
+                        emailError = null
+                    },
                     label = { Text("Email") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -76,6 +87,10 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next
                     ),
+                    isError = emailError != null,
+                    supportingText = emailError?.let {
+                        { Text(it, color = MaterialTheme.colorScheme.error) }
+                    },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -89,8 +104,7 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                     value = password,
                     onValueChange = {
                         password = it
-                        // Clear error when user types
-                        if (passwordError != null) passwordError = null
+                        passwordError = null
                     },
                     label = { Text("Şifre") },
                     modifier = Modifier.fillMaxWidth(),
@@ -100,60 +114,10 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Next
                     ),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                    ),
-                    isError = passwordError != null
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Added confirm password field
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = {
-                        confirmPassword = it
-                        // Clear error when user types
-                        if (passwordError != null) passwordError = null
-                    },
-                    label = { Text("Şifreyi Onayla") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Next
-                    ),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                    ),
                     isError = passwordError != null,
-                    supportingText = {
-                        if (passwordError != null) {
-                            Text(
-                                text = passwordError!!,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Kullanıcı Adı") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Next
-                    ),
+                    supportingText = passwordError?.let {
+                        { Text(it, color = MaterialTheme.colorScheme.error) }
+                    },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -164,15 +128,49 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = ageText,
-                    onValueChange = { ageText = it.filter { it.isDigit() } },
-                    label = { Text("Yaş") },
+                    value = confirmPassword,
+                    onValueChange = {
+                        confirmPassword = it
+                        passwordError = null
+                    },
+                    label = { Text("Şifreyi Onayla") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Next
+                    ),
+                    isError = passwordError != null,
+                    supportingText = passwordError?.let {
+                        { Text(it, color = MaterialTheme.colorScheme.error) }
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        usernameError = null
+                    },
+                    label = { Text("Kullanıcı Adı") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Done
                     ),
+                    isError = usernameError != null,
+                    supportingText = usernameError?.let {
+                        { Text(it, color = MaterialTheme.colorScheme.error) }
+                    },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -184,12 +182,23 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
 
                 Button(
                     onClick = {
-                        // Validate passwords match before submitting
-                        if (password != confirmPassword) {
-                            passwordError = "Şifreler eşleşmiyor"
-                        } else {
-                            val age = ageText.toIntOrNull() ?: 0
-                            viewModel.register(email, password, username, age)
+                        // Validasyonlar
+                        when {
+                            !isValidEmail(email) -> {
+                                emailError = "Geçerli bir e-posta giriniz"
+                            }
+                            !isValidPassword(password) -> {
+                                passwordError = "Şifre en az 8 karakter, büyük/küçük harf ve rakam içermeli"
+                            }
+                            password != confirmPassword -> {
+                                passwordError = "Şifreler eşleşmiyor"
+                            }
+                            username.isBlank() -> {
+                                usernameError = "Kullanıcı adı boş bırakılamaz"
+                            }
+                            else -> {
+                                viewModel.register(email, password, username)
+                            }
                         }
                     },
                     modifier = Modifier
@@ -200,11 +209,7 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(
-                        "Kayıt Ol",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Kayıt Ol", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -235,4 +240,5 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
         }
     }
 }
+
 

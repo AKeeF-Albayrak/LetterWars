@@ -21,7 +21,7 @@ import com.example.letterwars.ui.screen.common.FloatingLettersBackground
 
 @Composable
 fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewModel()) {
-    var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val status by viewModel.uiState.collectAsState()
 
@@ -60,9 +60,9 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                 Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email") },
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
@@ -99,7 +99,7 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = { viewModel.login(email, password) },
+                    onClick = { viewModel.login(username, password) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

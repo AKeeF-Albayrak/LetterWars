@@ -12,9 +12,9 @@ class LoginViewModel(private val authRepository: AuthRepository = AuthRepository
     private val _uiState = MutableStateFlow("")
     val uiState = _uiState.asStateFlow()
 
-    fun login(email: String, password: String) {
+    fun login(username: String, password: String) {
         viewModelScope.launch {
-            val result = authRepository.loginUser(email, password)
+            val result = authRepository.loginUserWithUsername(username, password)
             _uiState.value = if (result.isSuccess) "Giriş Başarılı" else "Hata: ${result.exceptionOrNull()?.message}"
         }
     }

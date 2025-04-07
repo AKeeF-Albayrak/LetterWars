@@ -14,9 +14,25 @@ class RegisterViewModel(
     private val _uiState = MutableStateFlow("")
     val uiState = _uiState.asStateFlow()
 
-    fun register(email: String, password: String, username: String, age: Int) {
+    fun register(email: String, password: String, username: String) {
         viewModelScope.launch {
-            val result = authRepository.registerUser(email, password, username, age)
+            if (!isValidEmail(email)) {
+                _uiState.value = "Geçerli bir e-posta adresi giriniz (ör: yazlab2@kocaeli.edu.tr)"
+                return@launch
+            }
+
+            if (!isValidPassword(password)) {
+                _uiState.value = "Şifre en az 8 karakter, büyük/küçük harf ve rakam içermelidir."
+                return@launch
+            }
+
+            val isUsernameTaken = authRepository.isUsernameTaken(username)
+            if (isUsernameTaken) {
+                _uiState.value = "Bu kullanıcı adı zaten kullanılıyor."
+                return@launch
+            }
+
+            val result = authRepository.registerUser(email, password, username)
             _uiState.value = if (result.isSuccess) {
                 "Kayıt başarılı!"
             } else {
@@ -24,4 +40,15 @@ class RegisterViewModel(
             }
         }
     }
+
+    private fun isValidEmail(email: String): Boolean {
+        val regex = Regex("^[A-Za-z0-9+_.-]+@(.+)$")
+        return regex.matches(email)
+    }
+
+    private fun isValidPassword(password: String): Boolean {
+        val regex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}\$")
+        return regex.matches(password)
+    }
+
 }
