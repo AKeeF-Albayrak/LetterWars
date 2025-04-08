@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.example.letterwars.ui.screen.home.HomeScreen
 import com.example.letterwars.ui.screen.login.LoginScreen
 import com.example.letterwars.ui.screen.register.RegisterScreen
 
@@ -15,6 +16,14 @@ fun AppNavGraph(navController: NavHostController) {
         }
         composable("register") {
             RegisterScreen(navController)
+        }
+        composable("home") {
+            HomeScreen(
+                onStartNewGame = { navController.navigate("new_game") },
+                onViewActiveGames = { navController.navigate("active_games") },
+                onViewFinishedGames = { navController.navigate("finished_games") },
+                onProfileClick = { navController.navigate("profile") }
+            )
         }
     }
 }

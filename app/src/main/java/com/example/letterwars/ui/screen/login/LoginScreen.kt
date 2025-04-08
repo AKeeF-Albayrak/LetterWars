@@ -139,6 +139,13 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                         textAlign = TextAlign.Center
                     )
                 }
+                LaunchedEffect(status) {
+                    if (status.contains("başarılı", ignoreCase = true)) {
+                        navController.navigate("home") {
+                            popUpTo("login") { inclusive = true }
+                        }
+                    }
+                }
             }
         }
     }

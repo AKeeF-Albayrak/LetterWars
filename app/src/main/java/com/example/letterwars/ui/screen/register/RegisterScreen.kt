@@ -182,7 +182,6 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
 
                 Button(
                     onClick = {
-                        // Validasyonlar
                         when {
                             !isValidEmail(email) -> {
                                 emailError = "Geçerli bir e-posta giriniz"
@@ -197,6 +196,7 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                                 usernameError = "Kullanıcı adı boş bırakılamaz"
                             }
                             else -> {
+
                                 viewModel.register(email, password, username)
                             }
                         }
@@ -235,6 +235,13 @@ fun RegisterScreen(navController: NavController, viewModel: RegisterViewModel = 
                             MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center
                     )
+                }
+                LaunchedEffect(status) {
+                    if (status.contains("başarılı", ignoreCase = true)) {
+                        navController.navigate("login") {
+                            popUpTo("register") { inclusive = true }
+                        }
+                    }
                 }
             }
         }

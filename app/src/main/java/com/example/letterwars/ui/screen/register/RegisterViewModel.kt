@@ -16,6 +16,7 @@ class RegisterViewModel(
 
     fun register(email: String, password: String, username: String) {
         viewModelScope.launch {
+
             if (!isValidEmail(email)) {
                 _uiState.value = "Geçerli bir e-posta adresi giriniz (ör: yazlab2@kocaeli.edu.tr)"
                 return@launch
@@ -31,7 +32,6 @@ class RegisterViewModel(
                 _uiState.value = "Bu kullanıcı adı zaten kullanılıyor."
                 return@launch
             }
-
             val result = authRepository.registerUser(email, password, username)
             _uiState.value = if (result.isSuccess) {
                 "Kayıt başarılı!"
