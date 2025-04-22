@@ -2,10 +2,14 @@ package com.example.letterwars.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.letterwars.ui.screen.home.HomeScreen
 import com.example.letterwars.ui.screen.login.LoginScreen
+import com.example.letterwars.ui.screen.newgame.NewGameScreen
+import com.example.letterwars.ui.screen.queue.QueueScreen
 import com.example.letterwars.ui.screen.register.RegisterScreen
 
 @Composable
@@ -14,9 +18,11 @@ fun AppNavGraph(navController: NavHostController) {
         composable("login") {
             LoginScreen(navController)
         }
+
         composable("register") {
             RegisterScreen(navController)
         }
+
         composable("home") {
             HomeScreen(
                 onStartNewGame = { navController.navigate("new_game") },
@@ -24,6 +30,35 @@ fun AppNavGraph(navController: NavHostController) {
                 onViewFinishedGames = { navController.navigate("finished_games") },
                 onProfileClick = { navController.navigate("profile") }
             )
+        }
+
+        composable("new_game") {
+            NewGameScreen(navController = navController)
+        }
+
+        composable(
+            route = "queue?duration={duration}",
+            arguments = listOf(
+                navArgument("duration") {
+                    type = NavType.StringType
+                    defaultValue = "5"
+                    nullable = true
+                }
+            )
+        ) {
+            QueueScreen(navController = navController)
+        }
+
+        composable("active_games") {
+            // ActiveGamesScreen will be implemented later
+        }
+
+        composable("finished_games") {
+            // FinishedGamesScreen will be implemented later
+        }
+
+        composable("profile") {
+            // ProfileScreen will be implemented later
         }
     }
 }
