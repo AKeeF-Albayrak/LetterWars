@@ -35,8 +35,8 @@ fun QueueScreen(
     // Get game duration from viewModel
     val gameDuration = viewModel.gameDuration
     val gameDurationText = when {
-        gameDuration < 60 -> "$gameDuration dakika"
-        else -> "${gameDuration / 60} saat"
+        gameDuration.minutes < 60 -> "${gameDuration.minutes} dakika"
+        else -> "${gameDuration.minutes / 60} saat"
     }
 
     // Format time as mm:ss
@@ -224,10 +224,10 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Cancel button
                 Button(
                     onClick = {
                         isInQueue = false
+                        viewModel.leaveQueue()
                         navController.popBackStack()
                     },
                     modifier = Modifier

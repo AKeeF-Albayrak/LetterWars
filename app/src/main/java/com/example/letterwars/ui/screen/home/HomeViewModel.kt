@@ -24,9 +24,8 @@ class HomeViewModel(
     private fun loadUser() {
         val uid = auth.currentUser?.uid ?: return
         viewModelScope.launch {
-            userDataSource.getUser(uid) { fetchedUser ->
-                _user.value = fetchedUser
-            }
+            val fetchedUser = userDataSource.getUser(uid)
+            _user.value = fetchedUser
         }
     }
 }

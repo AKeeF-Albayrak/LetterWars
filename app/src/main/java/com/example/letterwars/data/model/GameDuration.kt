@@ -1,8 +1,14 @@
 package com.example.letterwars.data.model
 
-enum class GameDuration(val displayName: String, val durationMillis: Long) {
-    QUICK_2_MIN("2 Dakika", 2 * 60 * 1000),
-    QUICK_5_MIN("5 Dakika", 5 * 60 * 1000),
-    EXTENDED_12_HOUR("12 Saat", 12 * 60 * 60 * 1000),
-    EXTENDED_24_HOUR("24 Saat", 24 * 60 * 60 * 1000)
+enum class GameDuration(val minutes: Int) {
+    QUICK_2(2),
+    QUICK_5(5),
+    EXTENDED_12H(720),
+    EXTENDED_24H(1440);
+
+    companion object {
+        fun fromMinutes(min: Int): GameDuration =
+            values().first { it.minutes == min }
+    }
 }
+

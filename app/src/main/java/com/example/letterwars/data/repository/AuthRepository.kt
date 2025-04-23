@@ -3,18 +3,14 @@ package com.example.letterwars.data.repository
 import com.example.letterwars.data.firebase.FirebaseUserDataSource
 import com.example.letterwars.data.model.User
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.FirebaseFirestore
 
 class AuthRepository(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
-    private val userDataSource: FirebaseUserDataSource = FirebaseUserDataSource()
+    private val userDataSource: FirebaseUserDataSource = FirebaseUserDataSource(),
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
-
-    private val dbRef = FirebaseDatabase
-        .getInstance("https://letterwars-f8384-default-rtdb.europe-west1.firebasedatabase.app/")
-        .reference
-
 
     suspend fun registerUser(email: String, password: String, username: String): Result<Unit> {
         return try {
@@ -41,13 +37,12 @@ class AuthRepository(
 
     suspend fun loginUserWithUsername(username: String, password: String): Result<Unit> {
         return try {
-            val snapshot = dbRef.child("users")
-                .orderByChild("username")
-                .equalTo(username)
+            val snapshot = firestore.collection("users")
+                .whereEqualTo("username", username)
                 .get()
                 .await()
 
-            val user = snapshot.children.firstOrNull()?.getValue(User::class.java)
+            val user = snapshot.documents.firstOrNull()?.toObject(User::class.java)
                 ?: return Result.failure(Exception("Kullanıcı bulunamadı"))
 
             auth.signInWithEmailAndPassword(user.email, password).await()
@@ -59,12 +54,11 @@ class AuthRepository(
 
     suspend fun isUsernameTaken(username: String): Boolean {
         return try {
-            val snapshot = dbRef.child("users")
-                .orderByChild("username")
-                .equalTo(username)
+            val snapshot = firestore.collection("users")
+                .whereEqualTo("username", username)
                 .get()
                 .await()
-            snapshot.exists()
+            !snapshot.isEmpty
         } catch (e: Exception) {
             false
         }

@@ -1,48 +1,36 @@
 package com.example.letterwars.data.firebase
 
 import android.util.Log
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.FirebaseFirestore
 import com.example.letterwars.data.model.User
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.DatabaseReference
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
 class FirebaseUserDataSource(
-    private val database: DatabaseReference = FirebaseDatabase
-        .getInstance("https://letterwars-f8384-default-rtdb.europe-west1.firebasedatabase.app/")
-        .reference
-
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    fun saveUser(user: User) {
-        database.child("users").child(user.uid).setValue(user)
-            .addOnSuccessListener {
-                println("FirebaseSave Kullanıcı başarıyla kaydedildi.")
-            }
-            .addOnFailureListener { e ->
-                println("FirebaseSave Hata oluştu: ${e.message}")
-            }
+    suspend fun saveUser(user: User): Boolean {
+        return try {
+            firestore.collection("users").document(user.uid).set(user).await()
+            Log.d("Firestore", "Kullanıcı başarıyla kaydedildi.")
+            true
+        } catch (e: Exception) {
+            Log.e("Firestore", "Kullanıcı kaydedilirken hata oluştu: ${e.message}")
+            false
+        }
     }
 
-
-
-
-
-    fun getUser(uid: String, onComplete: (User?) -> Unit) {
-        database.child("users").child(uid)
-            .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val user = snapshot.getValue(User::class.java)
-                    onComplete(user)
-                }
-
-                override fun onCancelled(error: DatabaseError) {
-                    onComplete(null)
-                }
-            })
+    suspend fun getUser(uid: String): User? {
+        return try {
+            val document = firestore.collection("users").document(uid).get().await()
+            if (document.exists()) {
+                document.toObject(User::class.java)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("Firestore", "Kullanıcı getirilirken hata oluştu: ${e.message}")
+            null
+        }
     }
 }

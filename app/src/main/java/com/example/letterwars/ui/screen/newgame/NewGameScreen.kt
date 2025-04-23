@@ -3,6 +3,8 @@ package com.example.letterwars.ui.screen.newgame
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +30,20 @@ fun NewGameScreen(
     ) {
         // Floating letters background
         FloatingLettersBackground()
+
+        // Back button in top left
+        IconButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier
+                .padding(16.dp)
+                .align(Alignment.TopStart)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Geri",
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
 
         // New Game content
         Card(
@@ -72,7 +88,6 @@ fun NewGameScreen(
                         description = "Hızlı oyun",
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            // Navigate directly to queue screen with game duration parameter
                             navController.navigate("queue?duration=2")
                         }
                     )
@@ -82,7 +97,6 @@ fun NewGameScreen(
                         description = "Standart oyun",
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            // Navigate directly to queue screen with game duration parameter
                             navController.navigate("queue?duration=5")
                         }
                     )
@@ -90,7 +104,6 @@ fun NewGameScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Extended Game Section
                 GameTypeSection(
                     title = "Genişletilmiş Oyun",
                     description = "Uzun süreli stratejik oyunlar için"
@@ -107,8 +120,7 @@ fun NewGameScreen(
                         description = "Günlük oyun",
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            // Navigate directly to queue screen with game duration parameter
-                            navController.navigate("queue?duration=720") // 12 hours in minutes
+                            navController.navigate("queue?duration=720")
                         }
                     )
 
@@ -117,29 +129,31 @@ fun NewGameScreen(
                         description = "Uzun oyun",
                         modifier = Modifier.weight(1f),
                         onClick = {
-                            // Navigate directly to queue screen with game duration parameter
-                            navController.navigate("queue?duration=1440") // 24 hours in minutes
+                            navController.navigate("queue?duration=1440")
                         }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Back button
-                OutlinedButton(
-                    onClick = { navController.popBackStack() },
+                // Changed "Geri Dön" to "Sıraya Gir" and made it a primary button
+                Button(
+                    onClick = {
+                        // Navigate to queue with default duration (5 minutes)
+                        navController.navigate("queue?duration=5")
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text(
-                        "Geri Dön",
+                        "Sıraya Gir",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -207,4 +221,3 @@ fun GameOptionButton(
         }
     }
 }
-
