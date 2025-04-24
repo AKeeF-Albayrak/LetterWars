@@ -39,10 +39,9 @@ class FirestoreGameDataSource(
 
             val tempGameId = UUID.randomUUID().toString()
 
-            // 📣 Logcat'e yaz
-            Log.d("FirestoreQueue", "🎮 Oyun bulundu: $playerId vs $opponentId (gameId: $tempGameId)")
+            Log.d("FirestoreQueue", "🎮 Oyun bulundu: $playerId vs $opponentId")
+            Triple(true, opponentId, null)
 
-            Triple(true, opponentId, tempGameId)
         } else {
             val queueEntry = mapOf(playerId to true)
             queueRef.set(queueEntry, SetOptions.merge()).await()
@@ -61,40 +60,6 @@ class FirestoreGameDataSource(
             true
         } catch (e: Exception) {
             false
-        }
-    }
-
-    suspend fun createGame(
-        player1Id: String,
-        player2Id: String,
-        duration: GameDuration
-    ): Pair<Boolean, String?> {
-        return try {
-            val gameId = UUID.randomUUID().toString()
-
-            val allLetters = generateLetterPool()
-            val player1Letters = drawLetters(allLetters, 7).toMutableList()
-            val player2Letters = drawLetters(allLetters, 7).toMutableList()
-            val board = generateEmptyBoard()
-            val firstTurnPlayerId = if (Math.random() < 0.5) player1Id else player2Id
-
-            val game = Game(
-                gameId = gameId,
-                player1Id = player1Id,
-                player2Id = player2Id,
-                currentTurnPlayerId = firstTurnPlayerId,
-                duration = duration,
-                board = board,
-                remainingLetters = allLetters,
-                player1Letters = player1Letters,
-                player2Letters = player2Letters,
-                startTimeMillis = System.currentTimeMillis()
-            )
-
-            firestore.collection("games").document(gameId).set(game).await()
-            Pair(true, gameId)
-        } catch (e: Exception) {
-            Pair(false, null)
         }
     }
 }

@@ -11,6 +11,7 @@ import com.example.letterwars.ui.screen.login.LoginScreen
 import com.example.letterwars.ui.screen.newgame.NewGameScreen
 import com.example.letterwars.ui.screen.queue.QueueScreen
 import com.example.letterwars.ui.screen.register.RegisterScreen
+import com.example.letterwars.ui.screen.game.GameScreen // <-- GameScreen import edildi
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -46,8 +47,16 @@ fun AppNavGraph(navController: NavHostController) {
                 }
             )
         ) {
-            QueueScreen(navController = navController)
+            QueueScreen(
+                navController = navController,
+                onMatchFound = { gameId ->
+                    navController.navigate("game/$gameId") {
+                        popUpTo("queue") { inclusive = true }
+                    }
+                }
+            )
         }
+
 
         composable("active_games") {
             // ActiveGamesScreen will be implemented later
@@ -60,5 +69,19 @@ fun AppNavGraph(navController: NavHostController) {
         composable("profile") {
             // ProfileScreen will be implemented later
         }
+
+        composable(
+            "game/{gameId}",
+            arguments = listOf(
+                navArgument("gameId") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val gameId = backStackEntry.arguments?.getString("gameId")
+            GameScreen(gameId = gameId, navController = navController)
+        }
+
+
     }
 }

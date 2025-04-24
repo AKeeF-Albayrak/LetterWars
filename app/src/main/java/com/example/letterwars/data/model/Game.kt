@@ -12,10 +12,10 @@ data class Game(
     val status: GameStatus = GameStatus.WAITING_FOR_PLAYER,
     val duration: GameDuration = GameDuration.QUICK_2,
     val startTimeMillis: Long = 0L,
-    val board: List<List<Tile>> = generateEmptyBoard(),
-    val remainingLetters: Map<Char, Int> = emptyMap(),
-    val player1Letters: List<Char> = emptyList(),
-    val player2Letters: List<Char> = emptyList(),
+    val board: Map<String, GameTile> = generateEmptyBoard(), // 🔄 Nested list yerine düz map, tip GameTile
+    val remainingLetters: Map<String, Int> = emptyMap(), // 🔄 Char → String
+    val player1Letters: List<String> = emptyList(), // 🔄 Char → String
+    val player2Letters: List<String> = emptyList(), // 🔄 Char → String
     val moveHistory: List<Move> = emptyList()
 )
 

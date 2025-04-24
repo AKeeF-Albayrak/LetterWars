@@ -1,11 +1,16 @@
 package com.example.letterwars.data.util
 
-import com.example.letterwars.data.model.Tile
+import com.example.letterwars.data.model.Game
+import com.example.letterwars.data.model.GameTile
 
-fun generateEmptyBoard(): List<List<Tile>> {
-    return List(15) {
-        List(15) { Tile() }
+fun generateEmptyBoard(): Map<String, GameTile> {
+    val board = mutableMapOf<String, GameTile>()
+    for (i in 0..14) {
+        for (j in 0..14) {
+            board["$i-$j"] = GameTile()
+        }
     }
+    return board
 }
 
 fun generateLetterPool(): MutableMap<Char, Int> {

@@ -26,7 +26,8 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun QueueScreen(
     navController: NavController,
-    viewModel: QueueViewModel = viewModel()
+    viewModel: QueueViewModel = viewModel(),
+    onMatchFound: (String) -> Unit
 ) {
     // State for timer
     var elapsedTime by remember { mutableStateOf(0L) }
@@ -48,14 +49,17 @@ fun QueueScreen(
         )
     }
 
-    // Timer effect
-    LaunchedEffect(isInQueue) {
-        elapsedTime = 0
-        while (isInQueue) {
-            delay(1000)
-            elapsedTime++
+    val gameId by viewModel.gameId.collectAsState()
+
+    LaunchedEffect(gameId) {
+        val currentGameId = gameId
+        if (currentGameId != null) {
+            isInQueue = false
+            onMatchFound(currentGameId)
         }
+
     }
+
 
     // Pulsating animation for the waiting indicator
     val infiniteTransition = rememberInfiniteTransition(label = "pulsating")

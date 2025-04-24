@@ -1,10 +1,12 @@
 package com.example.letterwars.data.repository
 
 import com.example.letterwars.data.firebase.FirestoreGameDataSource
+import com.example.letterwars.data.firebase.FireBaseGameDataSource
 import com.example.letterwars.data.model.GameDuration
 
 class GameRepository(
-    private val dataSource: FirestoreGameDataSource = FirestoreGameDataSource()
+    private val queueDataSource: FirestoreGameDataSource = FirestoreGameDataSource(), // join/leave
+    private val gameDataSource: FireBaseGameDataSource = FireBaseGameDataSource()     // createGame
 ) {
 
     suspend fun joinMatchQueue(
@@ -12,10 +14,10 @@ class GameRepository(
         duration: GameDuration,
         onGameReady: (Boolean, String?) -> Unit
     ) {
-        val (matched, opponentId, _) = dataSource.joinQueue(playerId, duration)
+        val (matched, opponentId, _) = queueDataSource.joinQueue(playerId, duration)
 
         if (matched && opponentId != null) {
-            val (success, gameId) = dataSource.createGame(
+            val (success, gameId) = gameDataSource.createGame(
                 player1Id = opponentId,
                 player2Id = playerId,
                 duration = duration
@@ -31,7 +33,7 @@ class GameRepository(
         duration: GameDuration,
         onLeft: (Boolean) -> Unit
     ) {
-        val success = dataSource.leaveQueue(playerId, duration)
+        val success = queueDataSource.leaveQueue(playerId, duration)
         onLeft(success)
     }
 }
