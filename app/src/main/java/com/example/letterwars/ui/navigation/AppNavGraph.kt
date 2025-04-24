@@ -9,9 +9,10 @@ import androidx.navigation.navArgument
 import com.example.letterwars.ui.screen.home.HomeScreen
 import com.example.letterwars.ui.screen.login.LoginScreen
 import com.example.letterwars.ui.screen.newgame.NewGameScreen
+import com.example.letterwars.ui.screen.profile.UserProfileScreen
 import com.example.letterwars.ui.screen.queue.QueueScreen
 import com.example.letterwars.ui.screen.register.RegisterScreen
-import com.example.letterwars.ui.screen.game.GameScreen // <-- GameScreen import edildi
+import com.example.letterwars.ui.screen.game.GameScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -57,7 +58,6 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
-
         composable("active_games") {
             // ActiveGamesScreen will be implemented later
         }
@@ -67,7 +67,15 @@ fun AppNavGraph(navController: NavHostController) {
         }
 
         composable("profile") {
-            // ProfileScreen will be implemented later
+            UserProfileScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onSignedOut = {
+                    // Çıkış yapıldığında login ekranına yönlendir ve backstack temizle
+                    navController.navigate("login") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
         }
 
         composable(
@@ -81,7 +89,5 @@ fun AppNavGraph(navController: NavHostController) {
             val gameId = backStackEntry.arguments?.getString("gameId")
             GameScreen(gameId = gameId, navController = navController)
         }
-
-
     }
 }
