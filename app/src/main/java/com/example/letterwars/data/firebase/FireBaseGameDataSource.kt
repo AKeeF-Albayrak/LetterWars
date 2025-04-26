@@ -123,15 +123,16 @@ class FireBaseGameDataSource(
         onGameFound: (String?) -> Unit
     ): ListenerRegistration {
         return firestore.collection("games")
-            .whereIn("currentTurnPlayerId", listOf(playerId))
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     onGameFound(null)
                     return@addSnapshotListener
                 }
 
-                val gameDoc = snapshot?.documents?.firstOrNull {
-                    it.getString("player1Id") == playerId || it.getString("player2Id") == playerId
+                val gameDoc = snapshot?.documents?.firstOrNull { document ->
+                    val player1Id = document.getString("player1Id")
+                    val player2Id = document.getString("player2Id")
+                    (player1Id == playerId || player2Id == playerId)
                 }
 
                 if (gameDoc != null) {
@@ -139,5 +140,4 @@ class FireBaseGameDataSource(
                 }
             }
     }
-
 }

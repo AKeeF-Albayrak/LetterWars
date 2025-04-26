@@ -158,7 +158,6 @@ fun GameScreen(gameId: String?, navController: NavController) {
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Main game card - çiziminize göre düzenlendi
         Card(
             modifier = Modifier
                 .fillMaxSize()
@@ -177,6 +176,10 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    val isPlayer1 = gameState?.player1Id == viewModel.currentUserId
+
+                    val playerScore = if (isPlayer1) gameState?.player1Score ?: 0 else gameState?.player2Score ?: 0
+                    val opponentScore = if (isPlayer1) gameState?.player2Score ?: 0 else gameState?.player1Score ?: 0
                     // Player cards at the top
                     Row(
                         modifier = Modifier
@@ -188,7 +191,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         // Player card
                         PlayerScoreCard(
                             name = "Oyuncu",
-                            score = 118,
+                            score = playerScore,
                             isActive = isPlayerTurn,
                             showArrow = false,
                             arrowDirection = ""
@@ -196,12 +199,11 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                         PlayerScoreCard(
                             name = "Rakip",
-                            score = 89,
+                            score = opponentScore,
                             isActive = !isPlayerTurn,
                             showArrow = false,
                             arrowDirection = "",
                             onClick = {
-                                // Burada arkadaş ekleme işlevi olacak
                                 println("Rakip kartına tıklandı, arkadaş ekleme işlevi burada olacak")
                             }
                         )
