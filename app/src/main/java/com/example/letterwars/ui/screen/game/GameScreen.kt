@@ -193,7 +193,6 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             arrowDirection = ""
                         )
 
-                        // Opponent card - tıklama olayı eklendi
                         PlayerScoreCard(
                             name = "Rakip",
                             score = 89,
@@ -228,11 +227,15 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             Spacer(modifier = Modifier.width(48.dp))
                         }
 
-                        // Timer
-                        ClockTimer(
-                            remainingSeconds = remainingTimeSeconds.value,
-                            totalSeconds = gameState!!.duration.minutes*60
-                        )
+                        val currentGame = gameState
+
+                        if (currentGame != null) {
+                            ClockTimer(
+                                remainingSeconds = remainingTimeSeconds.value,
+                                totalSeconds = currentGame.duration.minutes * 60
+                            )
+                        }
+
 
                         // Right arrow (opponent turn)
                         if (!isPlayerTurn.value) {
