@@ -21,13 +21,10 @@ class FireBaseGameDataSource(
         return try {
             val gameId = UUID.randomUUID().toString()
 
-            val allLetters = generateLetterPool() // örnek: Map<Char, Int>
-            val stringKeyedLetters = allLetters.mapKeys { it.key.toString() } // ✅ Map<String, Int>
-
-            val player1Letters = drawLetters(allLetters, 7).map { it.toString() }.toMutableList()
-            val player2Letters = drawLetters(allLetters, 7).map { it.toString() }.toMutableList()
-            val board = generateEmptyBoard()
             val firstTurnPlayerId = if (Math.random() < 0.5) player1Id else player2Id
+
+            val letterPool = generateLetterPool()
+            val drawnLetters = drawLetters(letterPool, 7)
 
             val game = Game(
                 gameId = gameId,
@@ -35,18 +32,31 @@ class FireBaseGameDataSource(
                 player2Id = player2Id,
                 currentTurnPlayerId = firstTurnPlayerId,
                 duration = duration,
-                board = board,
-                remainingLetters = stringKeyedLetters,
-                player1Letters = player1Letters,
-                player2Letters = player2Letters,
+                board = generateEmptyBoard().toMutableMap(),
+                remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
+                currentLetters = drawnLetters.map { it.toString() }.toMutableList(),
                 startTimeMillis = System.currentTimeMillis()
             )
+
 
             firestore.collection("games").document(gameId).set(game).await()
             Pair(true, gameId)
         } catch (e: Exception) {
             Log.e("FireBaseGameDataSource", "❌ createGame hatası: ${e.message}")
             Pair(false, null)
+        }
+    }
+
+    suspend fun getGame(gameId: String): Game? {
+        return try {
+            val snapshot = firestore.collection("games")
+                .document(gameId)
+                .get()
+                .await()
+
+            snapshot.toObject(Game::class.java)
+        } catch (e: Exception) {
+            null
         }
     }
 }

@@ -7,6 +7,7 @@ import com.example.letterwars.data.util.generateEmptyBoard
 import com.example.letterwars.data.util.generateLetterPool
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -62,4 +63,24 @@ class FirestoreGameDataSource(
             false
         }
     }
+
+    fun listenQueueUserCount(
+        duration: GameDuration,
+        onUpdate: (Int) -> Unit
+    ): ListenerRegistration {
+        val queueRef = firestore.collection("matchQueue")
+            .document(duration.minutes.toString())
+
+        return queueRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                onUpdate(0)
+                return@addSnapshotListener
+            }
+
+            val count = snapshot?.data?.size ?: 0
+            onUpdate(count)
+        }
+    }
+
+
 }

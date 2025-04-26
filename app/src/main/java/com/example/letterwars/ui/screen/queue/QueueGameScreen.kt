@@ -29,18 +29,16 @@ fun QueueScreen(
     viewModel: QueueViewModel = viewModel(),
     onMatchFound: (String) -> Unit
 ) {
-    // State for timer
     var elapsedTime by remember { mutableStateOf(0L) }
     var isInQueue by remember { mutableStateOf(true) }
+    var showMatchFoundCard by remember { mutableStateOf(false) }
 
-    // Get game duration from viewModel
     val gameDuration = viewModel.gameDuration
     val gameDurationText = when {
         gameDuration.minutes < 60 -> "${gameDuration.minutes} dakika"
         else -> "${gameDuration.minutes / 60} saat"
     }
 
-    // Format time as mm:ss
     val formattedTime = remember(elapsedTime) {
         String.format(
             "%02d:%02d",
@@ -49,19 +47,26 @@ fun QueueScreen(
         )
     }
 
+    LaunchedEffect(isInQueue) {
+        while (isInQueue) {
+            delay(1000L)
+            elapsedTime++
+        }
+    }
+
     val gameId by viewModel.gameId.collectAsState()
 
     LaunchedEffect(gameId) {
         val currentGameId = gameId
         if (currentGameId != null) {
             isInQueue = false
+            showMatchFoundCard = true
+            delay(2000L)
             onMatchFound(currentGameId)
         }
-
     }
 
 
-    // Pulsating animation for the waiting indicator
     val infiniteTransition = rememberInfiniteTransition(label = "pulsating")
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.8f,
@@ -78,10 +83,8 @@ fun QueueScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Floating letters background
         FloatingLettersBackground()
 
-        // Queue content
         Card(
             modifier = Modifier
                 .padding(24.dp)
@@ -107,7 +110,6 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Show selected game duration
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -137,7 +139,6 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Pulsating circles animation
                 Box(
                     modifier = Modifier
                         .size(120.dp)
@@ -189,7 +190,6 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Estimated time
                 Text(
                     text = "Tahmini Bekleme: 01:30",
                     style = MaterialTheme.typography.bodyMedium,
@@ -198,7 +198,6 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Players in queue
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -217,12 +216,15 @@ fun QueueScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        val queueUserCount by viewModel.queueUserCount.collectAsState()
+
                         Text(
-                            text = "24",
+                            text = queueUserCount.toString(),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
+
                     }
                 }
 
@@ -246,6 +248,40 @@ fun QueueScreen(
                         "Sıradan Çık",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        if (showMatchFoundCard) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "🎉 Karşılaşma Bulundu!",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Hazırlanıyor...",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }

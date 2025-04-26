@@ -1,6 +1,7 @@
 package com.example.letterwars.data.model
 
 import com.example.letterwars.data.util.generateEmptyBoard
+import com.example.letterwars.data.util.generateLetterPool
 
 data class Game(
     val gameId: String = "",
@@ -9,14 +10,11 @@ data class Game(
     val currentTurnPlayerId: String = "",
     val player1Score: Int = 0,
     val player2Score: Int = 0,
-    val status: GameStatus = GameStatus.WAITING_FOR_PLAYER,
+    val status: GameStatus = GameStatus.IN_PROGRESS,
     val duration: GameDuration = GameDuration.QUICK_2,
     val startTimeMillis: Long = 0L,
-    val board: Map<String, GameTile> = generateEmptyBoard(), // 🔄 Nested list yerine düz map, tip GameTile
-    val remainingLetters: Map<String, Int> = emptyMap(), // 🔄 Char → String
-    val player1Letters: List<String> = emptyList(), // 🔄 Char → String
-    val player2Letters: List<String> = emptyList(), // 🔄 Char → String
-    val moveHistory: List<Move> = emptyList()
+    val board: MutableMap<String, GameTile> = generateEmptyBoard().toMutableMap(),
+    val remainingLetters: MutableMap<String, Int> = generateLetterPool().mapKeys { it.key.toString() }.toMutableMap(),
+    val currentLetters: MutableList<String> = mutableListOf(),
+    val moveHistory: MutableList<Move> = mutableListOf()
 )
-
-
