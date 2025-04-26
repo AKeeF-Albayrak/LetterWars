@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.data.model.CellType
+import com.example.letterwars.data.model.Game
 import com.example.letterwars.data.model.GameTile
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -52,17 +53,17 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     LaunchedEffect(gameId) {
         if (gameId != null) {
-            viewModel.loadGame(gameId)
+            viewModel.listenGameChanges(gameId)
         }
     }
 
-
+    val showGameOver = remember { mutableStateOf(false) }
+    val loserPlayerId = remember { mutableStateOf<String?>(null) }
 
     var draggedLetter by remember { mutableStateOf<DraggedLetter?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
 
-    // State for the selected letter (for tap-to-place method)
     val selectedLetter = remember { mutableStateOf<SelectedLetter?>(null) }
 
     val isPlayerTurn = remember { mutableStateOf(true) }
@@ -70,11 +71,22 @@ fun GameScreen(gameId: String?, navController: NavController) {
     val remainingTimeSeconds = remember { mutableStateOf(150) }
 
     LaunchedEffect(isPlayerTurn.value) {
+        remainingTimeSeconds.value = gameState?.duration?.minutes?.times(60) ?: 150
+
         while (remainingTimeSeconds.value > 0) {
             delay(1000L)
             remainingTimeSeconds.value -= 1
         }
-        // Burada süre bitince istersen "Sıra geçsin" gibi işlemler yapabilirsin
+
+        if (remainingTimeSeconds.value <= 0 && gameState != null) {
+            val loserId = gameState?.currentTurnPlayerId
+            loserPlayerId.value = loserId
+
+            if (loserId != null) {
+                viewModel.endGame(gameState!!, loserId)
+            }
+            showGameOver.value = true
+        }
     }
 
     val boardState = remember(gameState?.board) {
@@ -98,37 +110,24 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     val cellPositions = remember { mutableStateMapOf<Pair<Int, Int>, Pair<Offset, Size>>() }
 
-    // Function to place a letter on the board
     val placeLetter = { letter: RackLetter, rackIndex: Int, row: Int, col: Int ->
-        // Place the letter on the board
         placedLetters[Pair(row, col)] = letter
 
-        // Remove the letter from the rack
         if (rackIndex != -1) {
             rackLetters[rackIndex] = RackLetter(letter = "", points = 0)
         }
 
+        viewModel.addPendingMove(row, col, letter.letter)
+
         selectedLetter.value = null
         draggedLetter = null
+
+        viewModel.updateValidPositions()
     }
 
-    // Calculate valid placement positions (simplified for demo)
-    val validPlacementPositions = remember(selectedLetter.value) {
-        if (selectedLetter.value != null) {
-            // For demo purposes, let's say all empty cells are valid
-            val positions = mutableListOf<Pair<Int, Int>>()
-            for (i in 0..14) {
-                for (j in 0..14) {
-                    if (!placedLetters.containsKey(Pair(i, j))) {
-                        positions.add(Pair(i, j))
-                    }
-                }
-            }
-            positions
-        } else {
-            emptyList()
-        }
-    }
+
+    val validPlacementPositions by viewModel.validPositions.collectAsState()
+
 
     // Function to check if a position is over a valid board cell
     val findCellAtPosition = { position: Offset ->
@@ -232,7 +231,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         // Timer
                         ClockTimer(
                             remainingSeconds = remainingTimeSeconds.value,
-                            totalSeconds = 150
+                            totalSeconds = gameState!!.duration.minutes*60
                         )
 
                         // Right arrow (opponent turn)
@@ -273,27 +272,34 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Yeni kart: Teslim ol ve Pas butonları
                     GameActionsCard(
                         onSurrender = {
-                            // Teslim ol butonuna tıklandığında yapılacak işlemler
-                            println("Teslim ol butonuna tıklandı")
+                            if (gameState != null && viewModel.currentUserId != null) {
+                                viewModel.endGame(gameState!!, viewModel.currentUserId!!)
+                                showGameOver.value = true
+                            }
                         },
                         onPass = {
-                            // Pas butonuna tıklandığında yapılacak işlemler
-                            println("Pas butonuna tıklandı")
+                            viewModel.passTurn()
+                            placedLetters.clear()
+                        },
+                        onConfirm = {
+                            viewModel.confirmMove(placedLetters)
+                            placedLetters.clear()
+                        },
+                        onUndo = {
+                            viewModel.clearPendingMoves()
+                            placedLetters.clear()
                         }
                     )
 
-                    // Harf rafını yukarı çekmek ve butonları aşağı çekmek için weight değerini artır
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Letter rack - yukarı kaldırıldı
                     LetterRack(
                         letters = rackLetters,
                         selectedLetter = selectedLetter,
+                        isPlayerTurn = isPlayerTurn.value,
                         onLetterClick = { letter, points, index ->
-                            // Toggle selection
                             if (selectedLetter.value?.rackIndex == index) {
                                 selectedLetter.value = null
                             } else {
@@ -301,7 +307,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             }
                         },
                         onLetterDragStart = { letter, points, index, offset, position ->
-                            selectedLetter.value = null // Clear any selection when dragging
+                            selectedLetter.value = null
                             draggedLetter = DraggedLetter(letter, points, index)
                             dragOffset = offset
                             dragStartPosition = position
@@ -326,6 +332,9 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                             draggedLetter = null
                             dragOffset = Offset.Zero
+                        },
+                        onShuffle = {
+                            rackLetters.shuffle()
                         }
                     )
 
@@ -366,13 +375,77 @@ fun GameScreen(gameId: String?, navController: NavController) {
                 }
             }
         }
+        if (showGameOver.value) {
+            viewModel.currentUserId?.let {
+                GameOverCard(
+                    game = gameState!!,
+                    currentUserId = it,
+                    navController = navController
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun GameOverCard(game: Game, currentUserId: String, navController: NavController) {
+    val message = when {
+        game.winnerId == null -> "Berabere! 🤝"
+        game.winnerId == currentUserId -> "Tebrikler, Kazandın! 🎉"
+        else -> "Üzgünüm, Kaybettin. 😢"
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier
+                .padding(32.dp)
+                .fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Oyun Bitti",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = message,
+                    fontSize = 20.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = {
+                        navController.navigate("home_screen") {
+                            popUpTo(0)
+                        }
+                    }
+                ) {
+                    Text("Ana Sayfaya Dön")
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun GameActionsCard(
     onSurrender: () -> Unit,
-    onPass: () -> Unit
+    onPass: () -> Unit,
+    onConfirm: () -> Unit,
+    onUndo: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -386,58 +459,60 @@ fun GameActionsCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Teslim ol butonu
             Button(
                 onClick = onSurrender,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF9A9A) // Daha yumuşak kırmızı
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF9A9A)),
                 modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Teslim Ol",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Teslim Ol")
-                }
+                Icon(Icons.Default.Close, contentDescription = "Teslim Ol", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Teslim Ol", textAlign = TextAlign.Center)
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(4.dp))
 
-            // Pas butonu
             Button(
                 onClick = onPass,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF90CAF9)
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF90CAF9)),
                 modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Done,
-                        contentDescription = "Pas",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pas")
-                }
+                Icon(Icons.Default.Done, contentDescription = "Pas", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Pas", textAlign = TextAlign.Center)
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA5D6A7)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Done, contentDescription = "Onayla", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Onayla", textAlign = TextAlign.Center)
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Button(
+                onClick = onUndo,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFF59D)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Geri Al", modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Geri Al", textAlign = TextAlign.Center)
             }
         }
     }
 }
+
+
 
 @Composable
 fun PlayerScoreCard(
@@ -682,7 +757,6 @@ fun BoardCell(
                 }
             }
             !tile.letter.isNullOrEmpty() -> {
-                // Eğer tile'da hazır bir harf varsa onu göster
                 Text(
                     text = tile.letter,
                     fontSize = 12.sp,
@@ -691,7 +765,6 @@ fun BoardCell(
                 )
             }
             else -> {
-                // Yoksa multipler göster
                 when (tile.cellType) {
                     CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp)
                     CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp)
@@ -717,70 +790,108 @@ fun BoardCell(
 
 @Composable
 fun LetterRack(
-    letters: List<RackLetter>,
+    letters: MutableList<RackLetter>,
     selectedLetter: MutableState<SelectedLetter?>,
+    isPlayerTurn: Boolean,  // 🔥 Sıra sende mi kontrolü için eklendi
     onLetterClick: (String, Int, Int) -> Unit,
     onLetterDragStart: (String, Int, Int, Offset, Offset) -> Unit,
     onLetterDrag: (change: Any, Offset) -> Unit,
-    onLetterDragEnd: () -> Unit
+    onLetterDragEnd: () -> Unit,
+    onShuffle: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(70.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFBCAAA4) // Daha yumuşak kahverengi
-        )
-    ) {
-        Row(
+    Column {
+        Card(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxWidth()
+                .height(70.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFBCAAA4)
+            )
         ) {
-            for (i in letters.indices) {
-                val letter = letters[i]
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .aspectRatio(1f)
-                        .padding(2.dp)
-                ) {
-                    if (letter.letter.isNotEmpty()) {
-                        LetterTile(
-                            letter = letter.letter,
-                            points = letter.points,
-                            isSelected = selectedLetter.value?.rackIndex == i,
-                            onClick = {
-                                onLetterClick(letter.letter, letter.points, i)
-                            },
-                            onDragStart = { offset, position ->
-                                onLetterDragStart(letter.letter, letter.points, i, offset, position)
-                            },
-                            onDrag = onLetterDrag,
-                            onDragEnd = onLetterDragEnd
-                        )
-                    } else {
-                        Spacer(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0x33FFFFFF))
-                        )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                for (i in letters.indices) {
+                    val letter = letters[i]
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .padding(2.dp)
+                    ) {
+                        if (letter.letter.isNotEmpty()) {
+                            LetterTile(
+                                letter = letter.letter,
+                                points = letter.points,
+                                isSelected = selectedLetter.value?.rackIndex == i,
+                                isPlayerTurn = isPlayerTurn,
+                                onClick = {
+                                    if (isPlayerTurn) {
+                                        onLetterClick(letter.letter, letter.points, i)
+                                    }
+                                },
+                                onDragStart = { offset, position ->
+                                    if (isPlayerTurn) {
+                                        onLetterDragStart(letter.letter, letter.points, i, offset, position)
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    if (isPlayerTurn) {
+                                        onLetterDrag(change, dragAmount)
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (isPlayerTurn) {
+                                        onLetterDragEnd()
+                                    }
+                                }
+                            )
+                        } else {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0x33FFFFFF))
+                            )
+                        }
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = { if (isPlayerTurn) onShuffle() }, // 🔥 sadece kendi sıranda karıştırabilirsin
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFFFD54F)
+                )
+            ) {
+                Text(text = "Karıştır 🔀", fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
+
+
 
 @Composable
 fun LetterTile(
     letter: String,
     points: Int,
     isSelected: Boolean,
+    isPlayerTurn: Boolean,
     onClick: () -> Unit,
     onDragStart: (Offset, Offset) -> Unit,
     onDrag: (Any, Offset) -> Unit,
@@ -808,29 +919,33 @@ fun LetterTile(
             .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
             .border(borderWidth, borderColor, RoundedCornerShape(6.dp))
-            .clickable { onClick() }
+            .clickable(enabled = isPlayerTurn) {  // 🔥 sadece kendi sıranda tıklanabilir
+                onClick()
+            }
             .onGloballyPositioned { coordinates ->
                 position = coordinates.positionInRoot()
             }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        isDragging = true
-                        onDragStart(offset, position)
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        onDragEnd()
-                    },
-                    onDragCancel = {
-                        isDragging = false
-                        onDragEnd()
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        onDrag(change, dragAmount)
-                    }
-                )
+            .pointerInput(isPlayerTurn) {
+                if (isPlayerTurn) { // 🔥 sadece kendi sıranda sürükleyebilirsin
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            isDragging = true
+                            onDragStart(offset, position)
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            onDragEnd()
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            onDragEnd()
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDrag(change, dragAmount)
+                        }
+                    )
+                }
             },
         contentAlignment = Alignment.Center
     ) {

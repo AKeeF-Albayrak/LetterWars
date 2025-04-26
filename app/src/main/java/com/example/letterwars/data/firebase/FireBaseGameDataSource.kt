@@ -25,6 +25,7 @@ class FireBaseGameDataSource(
 
             val letterPool = generateLetterPool()
             val drawnLetters = drawLetters(letterPool, 7)
+            val startTimeMillis = System.currentTimeMillis()
 
             val game = Game(
                 gameId = gameId,
@@ -32,10 +33,11 @@ class FireBaseGameDataSource(
                 player2Id = player2Id,
                 currentTurnPlayerId = firstTurnPlayerId,
                 duration = duration,
+                startTimeMillis = startTimeMillis,
+                expireTimeMillis = startTimeMillis + (duration.minutes * 60 * 1000),
                 board = generateEmptyBoard().toMutableMap(),
                 remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
-                currentLetters = drawnLetters.map { it.toString() }.toMutableList(),
-                startTimeMillis = System.currentTimeMillis()
+                currentLetters = drawnLetters.map { it.toString() }.toMutableList()
             )
 
 
@@ -59,4 +61,60 @@ class FireBaseGameDataSource(
             null
         }
     }
+
+    suspend fun endGame(game: Game) {
+        try {
+            val winnerId = when {
+                game.player1Score > game.player2Score -> game.player1Id
+                game.player2Score > game.player1Score -> game.player2Id
+                else -> "DRAW"
+            }
+
+            firestore.collection("games")
+                .document(game.gameId)
+                .update(
+                    mapOf(
+                        "status" to GameStatus.FINISHED,
+                        "winnerId" to winnerId
+                    )
+                )
+                .await()
+
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ endGame hatası: ${e.message}")
+        }
+    }
+
+    suspend fun updateGame(game: Game) {
+        firestore.collection("games").document(game.gameId).set(game).await()
+    }
+
+    suspend fun updatePendingMoves(gameId: String, pendingMoves: Map<String, String>) {
+        firestore.collection("games").document(gameId)
+            .update("pendingMoves", pendingMoves)
+    }
+
+    suspend fun confirmMove(gameId: String, board: Map<String, GameTile>) {
+        firestore.collection("games").document(gameId)
+            .update(
+                mapOf(
+                    "board" to board,
+                    "pendingMoves" to emptyMap<String, String>()
+                )
+            )
+    }
+
+    fun listenGame(gameId: String, onGameChanged: (Game) -> Unit) {
+        firestore.collection("games")
+            .document(gameId)
+            .addSnapshotListener { snapshot, e ->
+                if (snapshot != null && snapshot.exists()) {
+                    val game = snapshot.toObject(Game::class.java)
+                    if (game != null) {
+                        onGameChanged(game)
+                    }
+                }
+            }
+    }
+
 }

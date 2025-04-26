@@ -13,8 +13,12 @@ data class Game(
     val status: GameStatus = GameStatus.IN_PROGRESS,
     val duration: GameDuration = GameDuration.QUICK_2,
     val startTimeMillis: Long = 0L,
+    val expireTimeMillis: Long = 0L,
     val board: MutableMap<String, GameTile> = generateEmptyBoard().toMutableMap(),
     val remainingLetters: MutableMap<String, Int> = generateLetterPool().mapKeys { it.key.toString() }.toMutableMap(),
     val currentLetters: MutableList<String> = mutableListOf(),
-    val moveHistory: MutableList<Move> = mutableListOf()
+    val moveHistory: MutableList<Move> = mutableListOf(),
+    val winnerId: String? = null,
+    val pendingMoves: Map<String, String> = emptyMap()
 )
+
