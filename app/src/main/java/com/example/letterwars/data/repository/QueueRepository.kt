@@ -45,4 +45,11 @@ class QueueRepository(
         return queueDataSource.listenQueueUserCount(duration, onUpdate)
     }
 
+    fun listenForGameForPlayer(
+        playerId: String,
+        onGameFound: (String?) -> Unit
+    ): ListenerRegistration {
+        return gameDataSource.listenForGameForPlayer(playerId, onGameFound)
+    }
+
 }

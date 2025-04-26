@@ -32,10 +32,21 @@ class QueueViewModel(
     private val _queueUserCount = MutableStateFlow(0)
     val queueUserCount: StateFlow<Int> = _queueUserCount
 
+    private var gameListener: ListenerRegistration? = null
+
 
     init {
         joinQueue()
         startListeningQueueUserCount()
+    }
+
+    private fun listenForGameMatch() {
+        gameListener = repo.listenForGameForPlayer(playerId) { foundGameId ->
+            if (foundGameId != null) {
+                _gameId.value = foundGameId
+                _isSearching.value = false
+            }
+        }
     }
 
     private fun joinQueue() = viewModelScope.launch {

@@ -37,7 +37,6 @@ class GameViewModel(
         }
     }
 
-
     fun endGame(game: Game, loserId: String) {
         viewModelScope.launch {
             val winnerId = when {
@@ -87,18 +86,9 @@ class GameViewModel(
             }
 
             val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
-            val newLetters = mutableListOf<String>()
+            val lettersNeeded = 7 - updatedCurrentLetters.size
+            val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
 
-            repeat(placedLetters.size) {
-                val randomLetter = updatedRemainingLetters.keys.randomOrNull()
-                if (randomLetter != null) {
-                    newLetters.add(randomLetter)
-                    updatedRemainingLetters[randomLetter] = updatedRemainingLetters[randomLetter]!! - 1
-                    if (updatedRemainingLetters[randomLetter] == 0) {
-                        updatedRemainingLetters.remove(randomLetter)
-                    }
-                }
-            }
             updatedCurrentLetters.addAll(newLetters)
 
             val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
@@ -109,9 +99,9 @@ class GameViewModel(
 
             val newMove = Move(
                 playerId = currentGame.currentTurnPlayerId,
-                word = placedLetters.values.joinToString("") { it.letter }, // Şimdilik basit birleştiriyoruz
+                word = placedLetters.values.joinToString("") { it.letter },
                 positions = placedLetters.keys.toList(),
-                scoreEarned = 0, // Şu an skor hesaplamıyoruz, istersen burada hesaplarız
+                scoreEarned = 0,
                 timeMillis = System.currentTimeMillis()
             )
 
@@ -124,7 +114,7 @@ class GameViewModel(
                 currentLetters = updatedCurrentLetters,
                 remainingLetters = updatedRemainingLetters,
                 currentTurnPlayerId = nextTurnPlayerId,
-                moveHistory = updatedMoveHistory // ⭐
+                moveHistory = updatedMoveHistory
             )
 
             repository.updateGame(updatedGame)
@@ -132,10 +122,17 @@ class GameViewModel(
         }
     }
 
-
     fun passTurn() {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
+
+            val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
+            val updatedCurrentLetters = currentGame.currentLetters.toMutableList()
+
+            val lettersNeeded = 7 - updatedCurrentLetters.size
+            val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
+
+            updatedCurrentLetters.addAll(newLetters)
 
             val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
                 currentGame.player2Id
@@ -144,11 +141,12 @@ class GameViewModel(
             }
 
             val updatedGame = currentGame.copy(
-                currentTurnPlayerId = nextTurnPlayerId
+                currentTurnPlayerId = nextTurnPlayerId,
+                currentLetters = updatedCurrentLetters,
+                remainingLetters = updatedRemainingLetters
             )
 
             repository.updateGame(updatedGame)
-
             _game.value = updatedGame
         }
     }
@@ -157,28 +155,22 @@ class GameViewModel(
         val currentGame = _game.value ?: return
 
         val board = currentGame.board
-
         val newValidPositions = mutableListOf<Pair<Int, Int>>()
 
         for (i in 0..14) {
             for (j in 0..14) {
                 val key = "$i-$j"
                 if (board[key]?.letter.isNullOrEmpty()) {
-                    // Komşu hücrede harf var mı kontrolü
                     val neighbors = listOf(
-                        "${i - 1}-$j",
-                        "${i + 1}-$j",
-                        "$i-${j - 1}",
-                        "$i-${j + 1}",
-                        "${i - 1}-${j - 1}",
-                        "${i + 1}-${j + 1}",
-                        "${i - 1}-${j + 1}",
-                        "${i + 1}-${j - 1}"
+                        "${i - 1}-$j", "${i + 1}-$j",
+                        "$i-${j - 1}", "$i-${j + 1}",
+                        "${i - 1}-${j - 1}", "${i + 1}-${j + 1}",
+                        "${i - 1}-${j + 1}", "${i + 1}-${j - 1}"
                     )
 
                     if (neighbors.any { neighborKey ->
                             board[neighborKey]?.letter?.isNotEmpty() == true
-                        } || (i == 7 && j == 7)) { // Başlangıç için merkez
+                        } || (i == 7 && j == 7)) {
                         newValidPositions.add(Pair(i, j))
                     }
                 }
@@ -188,4 +180,16 @@ class GameViewModel(
         _validPositions.value = newValidPositions
     }
 
+    private fun drawLetters(pool: MutableMap<String, Int>, count: Int): List<String> {
+        val available = pool.flatMap { entry -> List(entry.value) { entry.key } }.toMutableList()
+        available.shuffle()
+        val drawn = available.take(count)
+
+        drawn.forEach {
+            pool[it] = pool[it]?.minus(1) ?: 0
+            if (pool[it] == 0) pool.remove(it)
+        }
+
+        return drawn
+    }
 }

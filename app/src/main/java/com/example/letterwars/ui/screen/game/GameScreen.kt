@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -66,28 +63,32 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     val selectedLetter = remember { mutableStateOf<SelectedLetter?>(null) }
 
-    val isPlayerTurn = remember { mutableStateOf(true) }
+    val isPlayerTurn by remember(gameState?.currentTurnPlayerId) {
+        derivedStateOf {
+            gameState?.currentTurnPlayerId == viewModel.currentUserId
+        }
+    }
 
     val remainingTimeSeconds = remember { mutableStateOf(150) }
 
-    LaunchedEffect(isPlayerTurn.value) {
-        remainingTimeSeconds.value = gameState?.duration?.minutes?.times(60) ?: 150
+    LaunchedEffect(gameState?.gameId) {
+        gameState?.let { game ->
+            remainingTimeSeconds.value = game.duration.minutes.times(60)
 
-        while (remainingTimeSeconds.value > 0) {
-            delay(1000L)
-            remainingTimeSeconds.value -= 1
-        }
-
-        if (remainingTimeSeconds.value <= 0 && gameState != null) {
-            val loserId = gameState?.currentTurnPlayerId
-            loserPlayerId.value = loserId
-
-            if (loserId != null) {
-                viewModel.endGame(gameState!!, loserId)
+            while (remainingTimeSeconds.value > 0) {
+                delay(1000L)
+                remainingTimeSeconds.value -= 1
             }
-            showGameOver.value = true
+
+            if (remainingTimeSeconds.value <= 0) {
+                val loserId = game.currentTurnPlayerId
+                loserPlayerId.value = loserId
+                viewModel.endGame(game, loserId)
+                showGameOver.value = true
+            }
         }
     }
+
 
     val boardState = remember(gameState?.board) {
         List(15) { row ->
@@ -188,7 +189,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         PlayerScoreCard(
                             name = "Oyuncu",
                             score = 118,
-                            isActive = isPlayerTurn.value,
+                            isActive = isPlayerTurn,
                             showArrow = false,
                             arrowDirection = ""
                         )
@@ -196,7 +197,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         PlayerScoreCard(
                             name = "Rakip",
                             score = 89,
-                            isActive = !isPlayerTurn.value,
+                            isActive = !isPlayerTurn,
                             showArrow = false,
                             arrowDirection = "",
                             onClick = {
@@ -206,7 +207,6 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         )
                     }
 
-                    // Timer and turn indicators
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -214,8 +214,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left arrow (player turn)
-                        if (isPlayerTurn.value) {
+                        if (isPlayerTurn) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
                                 contentDescription = "Oyuncu Sırası",
@@ -236,9 +235,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             )
                         }
 
-
-                        // Right arrow (opponent turn)
-                        if (!isPlayerTurn.value) {
+                        if (!isPlayerTurn) {
                             Spacer(modifier = Modifier.width(16.dp))
                             Icon(
                                 imageVector = Icons.Default.ArrowForward,
@@ -275,33 +272,44 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    GameActionsCard(
-                        onSurrender = {
-                            if (gameState != null && viewModel.currentUserId != null) {
-                                viewModel.endGame(gameState!!, viewModel.currentUserId!!)
-                                showGameOver.value = true
+                    if(isPlayerTurn){
+                        GameActionsCard(
+                            onSurrender = {
+                                if (gameState != null && viewModel.currentUserId != null) {
+                                    viewModel.endGame(gameState!!, viewModel.currentUserId!!)
+                                    showGameOver.value = true
+                                }
+                            },
+                            onPass = {
+                                viewModel.passTurn()
+                                placedLetters.clear()
+                            },
+                            onConfirm = {
+                                viewModel.confirmMove(placedLetters)
+                                placedLetters.clear()
+                            },
+                            onUndo = {
+                                placedLetters.forEach { (_, rackLetter) ->
+                                    val emptyIndex = rackLetters.indexOfFirst { it.letter.isEmpty() }
+                                    if (emptyIndex != -1) {
+                                        rackLetters[emptyIndex] = rackLetter
+                                    } else {
+                                        rackLetters.add(rackLetter)
+                                    }
+                                }
+                                placedLetters.clear()
+                                viewModel.clearPendingMoves()
+                                viewModel.updateValidPositions()
                             }
-                        },
-                        onPass = {
-                            viewModel.passTurn()
-                            placedLetters.clear()
-                        },
-                        onConfirm = {
-                            viewModel.confirmMove(placedLetters)
-                            placedLetters.clear()
-                        },
-                        onUndo = {
-                            viewModel.clearPendingMoves()
-                            placedLetters.clear()
-                        }
-                    )
+                        )
+                    }
 
                     Spacer(modifier = Modifier.weight(1f))
 
                     LetterRack(
                         letters = rackLetters,
                         selectedLetter = selectedLetter,
-                        isPlayerTurn = isPlayerTurn.value,
+                        isPlayerTurn = isPlayerTurn,
                         onLetterClick = { letter, points, index ->
                             if (selectedLetter.value?.rackIndex == index) {
                                 selectedLetter.value = null
@@ -453,7 +461,7 @@ fun GameActionsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(60.dp),
+            .height(70.dp), // Yüksekliği biraz artırdım
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -462,60 +470,87 @@ fun GameActionsCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = 6.dp, vertical = 8.dp), // Dikey padding ekledim
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = onSurrender,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF9A9A)),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Teslim Ol", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Teslim Ol", textAlign = TextAlign.Center)
-            }
+            // Teslim ol butonu
+            ActionButton(
+                text = "Teslim Ol",
+                icon = Icons.Default.Close,
+                color = Color(0xFFEF9A9A),
+                onClick = onSurrender
+            )
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            Button(
-                onClick = onPass,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF90CAF9)),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Done, contentDescription = "Pas", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Pas", textAlign = TextAlign.Center)
-            }
+            // Pas butonu
+            ActionButton(
+                text = "Pas",
+                icon = Icons.Default.Done,
+                color = Color(0xFF90CAF9),
+                onClick = onPass
+            )
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFA5D6A7)),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Done, contentDescription = "Onayla", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Onayla", textAlign = TextAlign.Center)
-            }
+            // Onayla butonu
+            ActionButton(
+                text = "Onayla",
+                icon = Icons.Default.Done,
+                color = Color(0xFFA5D6A7),
+                onClick = onConfirm
+            )
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
-            Button(
-                onClick = onUndo,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFF59D)),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Geri Al", modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Geri Al", textAlign = TextAlign.Center)
-            }
+            // Geri Al butonu
+            ActionButton(
+                text = "Geri Al",
+                icon = Icons.Default.Close,
+                color = Color(0xFFFFF59D),
+                onClick = onUndo
+            )
         }
     }
 }
 
-
+@Composable
+fun ActionButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+        modifier = Modifier
+            .height(50.dp)
+            .height(50.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = text,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
+    }
+}
 
 @Composable
 fun PlayerScoreCard(
@@ -708,8 +743,6 @@ fun GameBoard(
     }
 }
 
-
-
 @Composable
 fun BoardCell(
     tile: GameTile,
@@ -788,8 +821,6 @@ fun BoardCell(
         }
     }
 }
-
-
 
 @Composable
 fun LetterRack(
@@ -875,19 +906,19 @@ fun LetterRack(
                 .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Button(
-                onClick = { if (isPlayerTurn) onShuffle() }, // 🔥 sadece kendi sıranda karıştırabilirsin
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFFD54F)
-                )
-            ) {
-                Text(text = "Karıştır 🔀", fontWeight = FontWeight.Bold)
+            if(isPlayerTurn){
+                Button(
+                    onClick = { onShuffle() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFD54F)
+                    )
+                ) {
+                    Text(text = "Karıştır 🔀", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
-
-
 
 @Composable
 fun LetterTile(

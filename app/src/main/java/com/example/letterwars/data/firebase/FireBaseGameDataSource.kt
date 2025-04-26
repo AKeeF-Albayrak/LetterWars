@@ -6,6 +6,7 @@ import com.example.letterwars.data.util.drawLetters
 import com.example.letterwars.data.util.generateEmptyBoard
 import com.example.letterwars.data.util.generateLetterPool
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
@@ -113,6 +114,28 @@ class FireBaseGameDataSource(
                     if (game != null) {
                         onGameChanged(game)
                     }
+                }
+            }
+    }
+
+    fun listenForGameForPlayer(
+        playerId: String,
+        onGameFound: (String?) -> Unit
+    ): ListenerRegistration {
+        return firestore.collection("games")
+            .whereIn("currentTurnPlayerId", listOf(playerId))
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    onGameFound(null)
+                    return@addSnapshotListener
+                }
+
+                val gameDoc = snapshot?.documents?.firstOrNull {
+                    it.getString("player1Id") == playerId || it.getString("player2Id") == playerId
+                }
+
+                if (gameDoc != null) {
+                    onGameFound(gameDoc.id)
                 }
             }
     }

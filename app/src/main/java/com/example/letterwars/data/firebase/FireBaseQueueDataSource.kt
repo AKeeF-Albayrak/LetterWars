@@ -30,7 +30,6 @@ class FirestoreGameDataSource(
         return if (playersInQueue.isNotEmpty()) {
             val opponentId = playersInQueue.first()
 
-            // 🔥 Kuyruktan sil
             queueRef.update(
                 mapOf(
                     opponentId to FieldValue.delete(),
@@ -81,6 +80,5 @@ class FirestoreGameDataSource(
             onUpdate(count)
         }
     }
-
 
 }
