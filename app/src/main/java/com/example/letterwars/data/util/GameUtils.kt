@@ -10,7 +10,7 @@ fun generateEmptyBoard(): Map<String, GameTile> {
     for (i in 0..14) {
         for (j in 0..14) {
             val cellType = when {
-                i == 7 && j == 7 -> CellType.CENTER
+                (i == 7 && j == 7) -> CellType.CENTER
 
                 (i == 0 || i == 14) && (j == 0 || j == 7 || j == 14) ||
                         (i == 7 && (j == 0 || j == 14)) -> CellType.TRIPLE_WORD
@@ -32,13 +32,24 @@ fun generateEmptyBoard(): Map<String, GameTile> {
                 else -> CellType.NORMAL
             }
 
-            board["$i-$j"] = GameTile(cellType = cellType)
+            val tile = if (i == 7 && j == 7) {
+                GameTile(
+                    letter = "*",
+                    cellType = CellType.CENTER
+                )
+            } else {
+                GameTile(
+                    letter = null,
+                    cellType = cellType
+                )
+            }
+
+            board["$i-$j"] = tile
         }
     }
 
     return board
 }
-
 
 fun generateLetterPool(): MutableMap<Char, Int> {
     return mutableMapOf(

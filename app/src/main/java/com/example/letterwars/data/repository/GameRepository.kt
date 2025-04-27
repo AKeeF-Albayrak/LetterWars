@@ -14,6 +14,10 @@ class GameRepository(
         gameDataSource.endGame(game)
     }
 
+    suspend fun endGame(game: Game, winnerId: String){
+        gameDataSource.endGame(game, winnerId)
+    }
+
     suspend fun updateGame(game: Game) {
         gameDataSource.updateGame(game)
     }

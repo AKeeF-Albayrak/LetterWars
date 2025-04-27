@@ -86,6 +86,23 @@ class FireBaseGameDataSource(
         }
     }
 
+    suspend fun endGame(game: Game, winnerId: String){
+        try {
+            firestore.collection("games")
+                .document(game.gameId)
+                .update(
+                    mapOf(
+                        "status" to GameStatus.FINISHED,
+                        "winnerId" to winnerId
+                    )
+                )
+                .await()
+
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ endGame2 hatası: ${e.message}")
+        }
+    }
+
     suspend fun updateGame(game: Game) {
         firestore.collection("games").document(game.gameId).set(game).await()
     }
@@ -120,24 +137,28 @@ class FireBaseGameDataSource(
 
     fun listenForGameForPlayer(
         playerId: String,
-        onGameFound: (String?) -> Unit
+        onGameFound: (String) -> Unit
     ): ListenerRegistration {
+        val firestore = FirebaseFirestore.getInstance()
         return firestore.collection("games")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    onGameFound(null)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
                     return@addSnapshotListener
                 }
-
-                val gameDoc = snapshot?.documents?.firstOrNull { document ->
-                    val player1Id = document.getString("player1Id")
-                    val player2Id = document.getString("player2Id")
-                    (player1Id == playerId || player2Id == playerId)
-                }
-
-                if (gameDoc != null) {
-                    onGameFound(gameDoc.id)
+                if (snapshot != null && !snapshot.isEmpty) {
+                    for (doc in snapshot.documents) {
+                        val game = doc.toObject(Game::class.java)
+                        if (game != null) {
+                            val isPlayerInGame = (game.player1Id == playerId || game.player2Id == playerId)
+                            val isGameActive = (game.status == GameStatus.IN_PROGRESS)
+                            if (isPlayerInGame && isGameActive) {
+                                onGameFound(game.gameId)
+                                break
+                            }
+                        }
+                    }
                 }
             }
     }
+
 }

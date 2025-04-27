@@ -1,5 +1,3 @@
-package com.example.letterwars.ui.screen.queue
-
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,11 +31,12 @@ class QueueViewModel(
     val queueUserCount: StateFlow<Int> = _queueUserCount
 
     private var gameListener: ListenerRegistration? = null
-
+    private var queueListener: ListenerRegistration? = null
 
     init {
         joinQueue()
         startListeningQueueUserCount()
+        listenForGameMatch()
     }
 
     private fun listenForGameMatch() {
@@ -57,18 +56,15 @@ class QueueViewModel(
                     _isSearching.value = false
                 }
             }
-            delay(3000L)
+            delay(2000L)
         }
     }
-
-    private var queueListener: ListenerRegistration? = null
 
     private fun startListeningQueueUserCount() {
         queueListener = repo.listenQueueUserCount(gameDuration) { count ->
             _queueUserCount.value = count
         }
     }
-
 
     fun leaveQueue() = viewModelScope.launch {
         repo.leaveMatchQueue(playerId, gameDuration) { /* ignore result */ }
@@ -80,6 +76,7 @@ class QueueViewModel(
             leaveQueue()
         }
         queueListener?.remove()
+        gameListener?.remove()
         super.onCleared()
     }
 }

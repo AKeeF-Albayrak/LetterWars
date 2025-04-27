@@ -3,9 +3,9 @@ package com.example.letterwars.ui.screen.game
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.letterwars.data.model.Game
-import com.example.letterwars.data.model.GameStatus
 import com.example.letterwars.data.model.GameTile
 import com.example.letterwars.data.model.Move
+import com.example.letterwars.data.model.Position
 import com.example.letterwars.data.repository.GameRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,15 +21,8 @@ class GameViewModel(
 
     val currentUserId: String? = FirebaseAuth.getInstance().currentUser?.uid
 
-    private val _validPositions = MutableStateFlow<List<Pair<Int, Int>>>(emptyList())
-    val validPositions: StateFlow<List<Pair<Int, Int>>> = _validPositions
-
-    fun loadGame(gameId: String) {
-        viewModelScope.launch {
-            val fetchedGame = repository.getGame(gameId)
-            _game.value = fetchedGame
-        }
-    }
+    private val _validPositions = MutableStateFlow<List<Position>>(emptyList())
+    val validPositions: StateFlow<List<Position>> = _validPositions
 
     fun listenGameChanges(gameId: String) {
         repository.listenGame(gameId) { updatedGame ->
@@ -37,20 +30,19 @@ class GameViewModel(
         }
     }
 
-    fun endGame(game: Game, loserId: String) {
+    fun SurrenderGame(game: Game, loserId: String) {
         viewModelScope.launch {
             val winnerId = when {
                 loserId == game.player1Id -> game.player2Id
                 loserId == game.player2Id -> game.player1Id
                 else -> null
             }
-
-            repository.endGame(
-                game.copy(
-                    status = GameStatus.FINISHED,
-                    winnerId = winnerId
-                )
-            )
+            if(winnerId == null){
+                println("Winner Id Nasi NULL oluo")
+            }else
+            {
+                repository.endGame(game, winnerId)
+            }
         }
     }
 
@@ -59,17 +51,43 @@ class GameViewModel(
         val updatedMoves = currentGame.pendingMoves.toMutableMap()
         updatedMoves["$row-$col"] = letter
 
-        val updatedGame = currentGame.copy(pendingMoves = updatedMoves)
+        val updatedBoard = currentGame.board.toMutableMap()
+        val key = "$row-$col"
+        val tile = updatedBoard[key]?.copy(letter = letter)
+        if (tile != null) {
+            updatedBoard[key] = tile
+        }
+
+        val updatedGame = currentGame.copy(
+            pendingMoves = updatedMoves,
+            board = updatedBoard
+        )
         _game.value = updatedGame
     }
+
 
     fun clearPendingMoves() {
         val currentGame = _game.value ?: return
-        val updatedGame = currentGame.copy(pendingMoves = emptyMap())
+
+        val updatedBoard = currentGame.board.toMutableMap()
+
+        // Pending moves'taki tüm hamleleri board'dan temizliyoruz
+        for (key in currentGame.pendingMoves.keys) {
+            val tile = updatedBoard[key]?.copy(letter = null)
+            if (tile != null) {
+                updatedBoard[key] = tile
+            }
+        }
+
+        val updatedGame = currentGame.copy(
+            pendingMoves = emptyMap(),
+            board = updatedBoard
+        )
         _game.value = updatedGame
     }
 
-    fun confirmMove(placedLetters: Map<Pair<Int, Int>, RackLetter>) {
+
+    fun confirmMove(placedLetters: Map<Position, RackLetter>) {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
 
@@ -153,32 +171,47 @@ class GameViewModel(
 
     fun updateValidPositions() {
         val currentGame = _game.value ?: return
-
         val board = currentGame.board
-        val newValidPositions = mutableListOf<Pair<Int, Int>>()
+        val newValidPositions = mutableListOf<Position>()
 
         for (i in 0..14) {
             for (j in 0..14) {
                 val key = "$i-$j"
-                if (board[key]?.letter.isNullOrEmpty()) {
-                    val neighbors = listOf(
-                        "${i - 1}-$j", "${i + 1}-$j",
-                        "$i-${j - 1}", "$i-${j + 1}",
-                        "${i - 1}-${j - 1}", "${i + 1}-${j + 1}",
-                        "${i - 1}-${j + 1}", "${i + 1}-${j - 1}"
-                    )
+                val tile = board[key]
 
-                    if (neighbors.any { neighborKey ->
-                            board[neighborKey]?.letter?.isNotEmpty() == true
-                        } || (i == 7 && j == 7)) {
-                        newValidPositions.add(Pair(i, j))
+                if (!tile?.letter.isNullOrEmpty()) continue
+
+                if (i == 7 && j == 7) {
+                    newValidPositions.add(Position(i, j))
+                    continue
+                }
+
+                val neighborOffsets = listOf(
+                    -1 to 0, 1 to 0,
+                    0 to -1, 0 to 1,
+                    -1 to -1, 1 to 1,
+                    -1 to 1, 1 to -1
+                )
+
+                if (neighborOffsets.any { (dx, dy) ->
+                        val neighborKey = "${i + dx}-${j + dy}"
+                        board[neighborKey]?.letter?.isNotEmpty() == true
                     }
+                ) {
+                    newValidPositions.add(Position(i, j))
                 }
             }
         }
 
         _validPositions.value = newValidPositions
+
+        println("Güncel Valid Positions (${newValidPositions.size} adet):")
+        newValidPositions.forEach { pos ->
+            println("Row: ${pos.row}, Col: ${pos.col}")
+        }
     }
+
+
 
     private fun drawLetters(pool: MutableMap<String, Int>, count: Int): List<String> {
         val available = pool.flatMap { entry -> List(entry.value) { entry.key } }.toMutableList()

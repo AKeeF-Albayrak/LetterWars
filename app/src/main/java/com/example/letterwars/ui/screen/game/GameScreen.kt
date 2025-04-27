@@ -36,11 +36,15 @@ import androidx.navigation.NavController
 import com.example.letterwars.data.model.CellType
 import com.example.letterwars.data.model.Game
 import com.example.letterwars.data.model.GameTile
+import com.example.letterwars.data.model.Position
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+// CompositionLocal to track if a letter is selected
+val LocalSelectedLetterExists = compositionLocalOf { false }
 
 @Composable
 fun GameScreen(gameId: String?, navController: NavController) {
@@ -75,6 +79,8 @@ fun GameScreen(gameId: String?, navController: NavController) {
         gameState?.let { game ->
             remainingTimeSeconds.value = game.duration.minutes.times(60)
 
+            viewModel.updateValidPositions()
+
             while (remainingTimeSeconds.value > 0) {
                 delay(1000L)
                 remainingTimeSeconds.value -= 1
@@ -83,7 +89,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
             if (remainingTimeSeconds.value <= 0) {
                 val loserId = game.currentTurnPlayerId
                 loserPlayerId.value = loserId
-                viewModel.endGame(game, loserId)
+                viewModel.SurrenderGame(game, loserId)
                 showGameOver.value = true
             }
         }
@@ -107,12 +113,13 @@ fun GameScreen(gameId: String?, navController: NavController) {
         }
     }
 
-    val placedLetters = remember { mutableStateMapOf<Pair<Int, Int>, RackLetter>() }
+    val placedLetters = remember { mutableStateMapOf<Position, RackLetter>() }
+    val cellPositions = remember { mutableStateMapOf<Position, Pair<Offset, Size>>() }
 
-    val cellPositions = remember { mutableStateMapOf<Pair<Int, Int>, Pair<Offset, Size>>() }
 
     val placeLetter = { letter: RackLetter, rackIndex: Int, row: Int, col: Int ->
-        placedLetters[Pair(row, col)] = letter
+        placedLetters[Position(row, col)] = letter
+
 
         if (rackIndex != -1) {
             rackLetters[rackIndex] = RackLetter(letter = "", points = 0)
@@ -126,13 +133,10 @@ fun GameScreen(gameId: String?, navController: NavController) {
         viewModel.updateValidPositions()
     }
 
-
     val validPlacementPositions by viewModel.validPositions.collectAsState()
 
-
-    // Function to check if a position is over a valid board cell
     val findCellAtPosition = { position: Offset ->
-        var foundCell: Pair<Int, Int>? = null
+        var foundCell: Position? = null
 
         cellPositions.forEach { (cellCoord, cellBounds) ->
             val (cellPos, cellSize) = cellBounds
@@ -251,26 +255,30 @@ fun GameScreen(gameId: String?, navController: NavController) {
                     }
 
                     // Game board
-                    GameBoard(
-                        boardState = boardState,
-                        placedLetters = placedLetters,
-                        validPlacementPositions = validPlacementPositions,
-                        onCellClick = { row, col ->
-                            selectedLetter.value?.let { selected ->
-                                if (validPlacementPositions.contains(Pair(row, col)) && !(row == 7 && col == 7)) {
-                                    placeLetter(
-                                        RackLetter(selected.letter, selected.points),
-                                        selected.rackIndex,
-                                        row,
-                                        col
-                                    )
+                    CompositionLocalProvider(
+                        LocalSelectedLetterExists provides (selectedLetter.value != null)
+                    ) {
+                        GameBoard(
+                            boardState = boardState,
+                            placedLetters = placedLetters,
+                            validPlacementPositions = validPlacementPositions,
+                            onCellClick = { row, col ->
+                                selectedLetter.value?.let { selected ->
+                                    if (validPlacementPositions.contains(Position(row, col)) && !(row == 7 && col == 7)) {
+                                        placeLetter(
+                                            RackLetter(selected.letter, selected.points),
+                                            selected.rackIndex,
+                                            row,
+                                            col
+                                        )
+                                    }
                                 }
+                            },
+                            onCellPositioned = { row, col, offset, size ->
+                                cellPositions[Position(row, col)] = Pair(offset, size)
                             }
-                        },
-                        onCellPositioned = { row, col, offset, size ->
-                            cellPositions[Pair(row, col)] = Pair(offset, size)
-                        }
-                    )
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -278,7 +286,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         GameActionsCard(
                             onSurrender = {
                                 if (gameState != null && viewModel.currentUserId != null) {
-                                    viewModel.endGame(gameState!!, viewModel.currentUserId!!)
+                                    viewModel.SurrenderGame(gameState!!, viewModel.currentUserId!!)
                                     showGameOver.value = true
                                 }
                             },
@@ -332,13 +340,13 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             val currentPosition = dragStartPosition + dragOffset
                             val targetCell = findCellAtPosition(currentPosition)
 
-                            if (targetCell != null && !(targetCell.first == 7 && targetCell.second == 7)) {
+                            if (targetCell != null && !(targetCell.row == 7 && targetCell.col == 7)) {
                                 draggedLetter?.let { letter ->
                                     placeLetter(
                                         RackLetter(letter.letter, letter.points),
                                         letter.rackIndex,
-                                        targetCell.first,
-                                        targetCell.second
+                                        targetCell.row,
+                                        targetCell.col
                                     )
                                 }
                             }
@@ -441,7 +449,7 @@ fun GameOverCard(game: Game, currentUserId: String, navController: NavController
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
                     onClick = {
-                        navController.navigate("home_screen") {
+                        navController.navigate("home") {
                             popUpTo(0)
                         }
                     }
@@ -522,14 +530,14 @@ fun ActionButton(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     color: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier // <<< yeni parametre ekledim
 ) {
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(containerColor = color),
-        modifier = Modifier
-            .height(50.dp)
-            .height(50.dp),
+        modifier = modifier
+            .height(50.dp), // sadece height garantilendi
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -697,8 +705,8 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
 @Composable
 fun GameBoard(
     boardState: List<List<GameTile>>,
-    placedLetters: Map<Pair<Int, Int>, RackLetter>,
-    validPlacementPositions: List<Pair<Int, Int>>,
+    placedLetters: Map<Position, RackLetter>,
+    validPlacementPositions: List<Position>,
     onCellClick: (Int, Int) -> Unit,
     onCellPositioned: (Int, Int, Offset, Size) -> Unit
 ) {
@@ -718,13 +726,15 @@ fun GameBoard(
                 ) {
                     for (j in boardState[i].indices) {
                         val tile = boardState[i][j]
-                        val placedLetter = placedLetters[Pair(i, j)]
-                        val isValidPlacement = validPlacementPositions.contains(Pair(i, j))
+                        val placedLetter = placedLetters[Position(i, j)]
+                        val isValidPlacement = validPlacementPositions.contains(Position(i, j))
 
                         BoardCell(
                             tile = tile,
                             placedLetter = placedLetter,
                             isValidPlacement = isValidPlacement,
+                            row = i,
+                            col = j,
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
@@ -750,6 +760,8 @@ fun BoardCell(
     tile: GameTile,
     placedLetter: RackLetter?,
     isValidPlacement: Boolean,
+    row: Int,
+    col: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -761,6 +773,10 @@ fun BoardCell(
         CellType.TRIPLE_WORD -> Color(0xFFE59866)
         CellType.CENTER -> Color(0xFFF9E79F)
     }
+
+    val isLetterSelected = LocalSelectedLetterExists.current
+    val isCenterCell = row == 7 && col == 7
+    val hasLetter = placedLetter != null || !tile.letter.isNullOrEmpty()
 
     Box(
         modifier = modifier
@@ -813,12 +829,16 @@ fun BoardCell(
             }
         }
 
-        if (isValidPlacement) {
+        // Sadece harf seçiliyse ve hücrede harf yoksa ve merkez hücre değilse nokta göster
+        if (isLetterSelected && !hasLetter && !isCenterCell) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(Color.Green.copy(alpha = 0.7f))
+                    .background(
+                        if (isValidPlacement) Color.Green.copy(alpha = 0.7f)
+                        else Color.Red.copy(alpha = 0.7f)
+                    )
             )
         }
     }

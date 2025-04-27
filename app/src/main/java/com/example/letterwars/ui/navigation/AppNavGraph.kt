@@ -70,7 +70,6 @@ fun AppNavGraph(navController: NavHostController) {
             UserProfileScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onSignedOut = {
-                    // Çıkış yapıldığında login ekranına yönlendir ve backstack temizle
                     navController.navigate("login") {
                         popUpTo("home") { inclusive = true }
                     }
@@ -88,6 +87,7 @@ fun AppNavGraph(navController: NavHostController) {
         ) { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId")
             GameScreen(gameId = gameId, navController = navController)
+
         }
     }
 }

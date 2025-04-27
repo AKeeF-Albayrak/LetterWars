@@ -1,5 +1,6 @@
 package com.example.letterwars.ui.screen.queue
 
+import QueueViewModel
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -172,7 +173,6 @@ fun QueueScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Timer
                 Text(
                     text = "Bekleme Süresi",
                     style = MaterialTheme.typography.titleMedium,
