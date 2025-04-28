@@ -1,11 +1,14 @@
 package com.example.letterwars.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.letterwars.data.repository.AuthRepository
 import com.example.letterwars.ui.screen.home.HomeScreen
 import com.example.letterwars.ui.screen.login.LoginScreen
 import com.example.letterwars.ui.screen.newgame.NewGameScreen
@@ -16,6 +19,17 @@ import com.example.letterwars.ui.screen.game.GameScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
+    val authRepository = remember { AuthRepository() }
+    val rememberedUsername = authRepository.getRememberedUsername()
+
+    LaunchedEffect(rememberedUsername) {
+        if (rememberedUsername != null) {
+            navController.navigate("home") {
+                popUpTo(0)
+            }
+        }
+    }
+
     NavHost(navController = navController, startDestination = "login") {
         composable("login") {
             LoginScreen(navController)
@@ -87,7 +101,6 @@ fun AppNavGraph(navController: NavHostController) {
         ) { backStackEntry ->
             val gameId = backStackEntry.arguments?.getString("gameId")
             GameScreen(gameId = gameId, navController = navController)
-
         }
     }
 }

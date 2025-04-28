@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.data.model.CellType
 import com.example.letterwars.data.model.Game
+import com.example.letterwars.data.model.GameStatus
 import com.example.letterwars.data.model.GameTile
 import com.example.letterwars.data.model.Position
 import kotlinx.coroutines.delay
@@ -73,27 +74,33 @@ fun GameScreen(gameId: String?, navController: NavController) {
         }
     }
 
-    val remainingTimeSeconds = remember { mutableStateOf(150) }
+    val remainingTimeSeconds = remember(gameState?.expireTimeMillis) {
+        mutableStateOf(
+            ((gameState?.expireTimeMillis ?: 0L) - System.currentTimeMillis()).coerceAtLeast(0) / 1000L
+        )
+    }
 
-    LaunchedEffect(gameState?.gameId) {
+    LaunchedEffect(gameState?.startTimeMillis, gameState?.expireTimeMillis) {
         gameState?.let { game ->
-            remainingTimeSeconds.value = game.duration.minutes.times(60)
+            while (true) {
+                val now = System.currentTimeMillis()
+                val newRemaining = (game.expireTimeMillis - now).coerceAtLeast(0) / 1000L
+                remainingTimeSeconds.value = newRemaining
 
-            viewModel.updateValidPositions()
+                if (newRemaining <= 0L) {
+                    val loserId = game.currentTurnPlayerId
+                    loserPlayerId.value = loserId
+                    viewModel.SurrenderGame(game, loserId)
+                    showGameOver.value = true
+                    break
+                }
 
-            while (remainingTimeSeconds.value > 0) {
                 delay(1000L)
-                remainingTimeSeconds.value -= 1
-            }
-
-            if (remainingTimeSeconds.value <= 0) {
-                val loserId = game.currentTurnPlayerId
-                loserPlayerId.value = loserId
-                viewModel.SurrenderGame(game, loserId)
-                showGameOver.value = true
             }
         }
     }
+
+
 
 
     val boardState = remember(gameState?.board) {
@@ -194,7 +201,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                     ) {
                         // Player card
                         PlayerScoreCard(
-                            name = "Oyuncu",
+                            name = viewModel.currentUsername.collectAsState().value,
                             score = playerScore,
                             isActive = isPlayerTurn,
                             showArrow = false,
@@ -202,7 +209,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         )
 
                         PlayerScoreCard(
-                            name = "Rakip",
+                            name = viewModel.opponentUsername.collectAsState().value,
                             score = opponentScore,
                             isActive = !isPlayerTurn,
                             showArrow = false,
@@ -236,7 +243,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                         if (currentGame != null) {
                             ClockTimer(
-                                remainingSeconds = remainingTimeSeconds.value,
+                                remainingSeconds = remainingTimeSeconds.value.toInt(),
                                 totalSeconds = currentGame.duration.minutes * 60
                             )
                         }
@@ -396,15 +403,14 @@ fun GameScreen(gameId: String?, navController: NavController) {
                 }
             }
         }
-        if (showGameOver.value) {
-            viewModel.currentUserId?.let {
-                GameOverCard(
-                    game = gameState!!,
-                    currentUserId = it,
-                    navController = navController
-                )
-            }
+        if (showGameOver.value || gameState?.status == GameStatus.FINISHED) {
+            GameOverCard(
+                game = gameState!!,
+                currentUserId = viewModel.currentUserId!!,
+                navController = navController
+            )
         }
+
     }
 }
 
@@ -620,23 +626,32 @@ fun PlayerScoreCard(
 
 @Composable
 fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
-    val progress = remainingSeconds.toFloat() / totalSeconds.toFloat()
     val minutes = remainingSeconds / 60
     val seconds = remainingSeconds % 60
+    val hours = minutes / 60
+
+    // Ekranda nasıl göstereceğiz? Süre 1 saatten büyükse saat formatı, değilse dakika formatı
+    val displayTime = if (totalSeconds >= 3600) {
+        String.format("%02d:%02d", hours, minutes % 60)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
+
+    val progress = remainingSeconds.toFloat() / totalSeconds.toFloat()
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(80.dp)
     ) {
-        // Clock face
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Draw clock outline
+            // Çevre çemberi
             drawCircle(
                 color = Color.LightGray,
                 radius = size.minDimension / 2,
                 style = Stroke(width = 4f)
             )
-            // Draw hour ticks
+
+            // Saat tik işaretleri
             for (i in 0 until 12) {
                 val angle = (i * 30) * (PI / 180f)
                 val startRadius = size.minDimension / 2 - 10f
@@ -655,33 +670,22 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
                 )
             }
 
-            // Draw minute hand
-            val minuteAngle = (remainingSeconds / 60f) * 360f * (PI / 180f)
-            val minuteHandLength = size.minDimension / 2 - 15f
-            val minuteX = (size.width / 2 + cos(minuteAngle - PI / 2) * minuteHandLength).toFloat()
-            val minuteY = (size.height / 2 + sin(minuteAngle - PI / 2) * minuteHandLength).toFloat()
+            // Progress'e göre dakika ibresi
+            val minuteAngle = (1f - progress) * 360f * (PI / 180f)
+            val handLength = size.minDimension / 2 - 15f
+
+            val handX = (size.width / 2 + cos(minuteAngle - PI / 2) * handLength).toFloat()
+            val handY = (size.height / 2 + sin(minuteAngle - PI / 2) * handLength).toFloat()
 
             drawLine(
                 color = Color.Black,
                 start = Offset(size.width / 2, size.height / 2),
-                end = Offset(minuteX, minuteY),
-                strokeWidth = 3f
+                end = Offset(handX, handY),
+                strokeWidth = 3f,
+                cap = StrokeCap.Round
             )
 
-            // Draw second hand
-            val secondAngle = (remainingSeconds % 60) * 6f * (PI / 180f)
-            val secondHandLength = size.minDimension / 2 - 10f
-            val secondX = (size.width / 2 + cos(secondAngle - PI / 2) * secondHandLength).toFloat()
-            val secondY = (size.height / 2 + sin(secondAngle - PI / 2) * secondHandLength).toFloat()
-
-            drawLine(
-                color = Color.Red,
-                start = Offset(size.width / 2, size.height / 2),
-                end = Offset(secondX, secondY),
-                strokeWidth = 2f
-            )
-
-            // Draw center dot
+            // Orta siyah nokta
             drawCircle(
                 color = Color.Black,
                 radius = 4f,
@@ -689,9 +693,8 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
             )
         }
 
-        // Digital time display
         Text(
-            text = String.format("%02d:%02d", minutes, seconds),
+            text = displayTime,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
@@ -701,6 +704,7 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
         )
     }
 }
+
 
 @Composable
 fun GameBoard(

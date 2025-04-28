@@ -7,6 +7,7 @@ import com.example.letterwars.data.model.GameTile
 import com.example.letterwars.data.model.Move
 import com.example.letterwars.data.model.Position
 import com.example.letterwars.data.repository.GameRepository
+import com.example.letterwars.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,14 +22,43 @@ class GameViewModel(
 
     val currentUserId: String? = FirebaseAuth.getInstance().currentUser?.uid
 
+    private val _currentUsername = MutableStateFlow<String>("")
+    val currentUsername: StateFlow<String> = _currentUsername
+
+    private val _opponentUsername = MutableStateFlow<String>("")
+    val opponentUsername: StateFlow<String> = _opponentUsername
+
+    private val userRepository = UserRepository()
+
+
     private val _validPositions = MutableStateFlow<List<Position>>(emptyList())
     val validPositions: StateFlow<List<Position>> = _validPositions
 
     fun listenGameChanges(gameId: String) {
         repository.listenGame(gameId) { updatedGame ->
             _game.value = updatedGame
+            updateValidPositions()
+
+            viewModelScope.launch {
+                loadUsernames(updatedGame)
+            }
         }
     }
+
+    private suspend fun loadUsernames(game: Game) {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+
+        val currentUser = userRepository.getUser(currentUserId)
+        _currentUsername.value = currentUser?.username ?: currentUser?.email ?: "Oyuncu"
+
+        val opponentId = if (game.player1Id == currentUserId) game.player2Id else game.player1Id
+
+        if (opponentId.isNotEmpty()) {
+            val opponentUser = userRepository.getUser(opponentId)
+            _opponentUsername.value = opponentUser?.username ?: opponentUser?.email ?: "Rakip"
+        }
+    }
+
 
     fun SurrenderGame(game: Game, loserId: String) {
         viewModelScope.launch {
@@ -63,15 +93,22 @@ class GameViewModel(
             board = updatedBoard
         )
         _game.value = updatedGame
-    }
 
+        viewModelScope.launch {
+            repository.updateBoardAndPendingMoves(
+                updatedGame.gameId,
+                updatedBoard,
+                updatedMoves
+            )
+        }
+    }
 
     fun clearPendingMoves() {
         val currentGame = _game.value ?: return
 
         val updatedBoard = currentGame.board.toMutableMap()
 
-        // Pending moves'taki tüm hamleleri board'dan temizliyoruz
+        // Sadece pending moves içindekileri temizle
         for (key in currentGame.pendingMoves.keys) {
             val tile = updatedBoard[key]?.copy(letter = null)
             if (tile != null) {
@@ -84,7 +121,16 @@ class GameViewModel(
             board = updatedBoard
         )
         _game.value = updatedGame
+
+        viewModelScope.launch {
+            repository.updateBoardAndPendingMoves(
+                updatedGame.gameId,
+                updatedBoard,
+                emptyMap()
+            )
+        }
     }
+
 
 
     fun confirmMove(placedLetters: Map<Position, RackLetter>) {
@@ -106,7 +152,6 @@ class GameViewModel(
             val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
             val lettersNeeded = 7 - updatedCurrentLetters.size
             val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
-
             updatedCurrentLetters.addAll(newLetters)
 
             val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
@@ -114,6 +159,9 @@ class GameViewModel(
             } else {
                 currentGame.player1Id
             }
+
+            val currentTime = System.currentTimeMillis()
+            val expireTime = currentTime + (currentGame.duration.minutes * 60 * 1000)
 
             val newMove = Move(
                 playerId = currentGame.currentTurnPlayerId,
@@ -132,13 +180,18 @@ class GameViewModel(
                 currentLetters = updatedCurrentLetters,
                 remainingLetters = updatedRemainingLetters,
                 currentTurnPlayerId = nextTurnPlayerId,
-                moveHistory = updatedMoveHistory
+                moveHistory = updatedMoveHistory,
+                pendingMoves = emptyMap(), // pendingMoves sıfırlıyoruz
+                startTimeMillis = currentTime, // yeni turn start time
+                expireTimeMillis = expireTime  // yeni turn expire time
             )
 
             repository.updateGame(updatedGame)
             _game.value = updatedGame
         }
     }
+
+
 
     fun passTurn() {
         viewModelScope.launch {
@@ -149,7 +202,6 @@ class GameViewModel(
 
             val lettersNeeded = 7 - updatedCurrentLetters.size
             val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
-
             updatedCurrentLetters.addAll(newLetters)
 
             val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
@@ -158,16 +210,23 @@ class GameViewModel(
                 currentGame.player1Id
             }
 
+            val currentTime = System.currentTimeMillis()
+            val expireTime = currentTime + (currentGame.duration.minutes * 60 * 1000)
+
             val updatedGame = currentGame.copy(
                 currentTurnPlayerId = nextTurnPlayerId,
                 currentLetters = updatedCurrentLetters,
-                remainingLetters = updatedRemainingLetters
+                remainingLetters = updatedRemainingLetters,
+                pendingMoves = emptyMap(), // pass turn'da da pendingMoves temizle
+                startTimeMillis = currentTime, // yeni turn start time
+                expireTimeMillis = expireTime  // yeni turn expire time
             )
 
             repository.updateGame(updatedGame)
             _game.value = updatedGame
         }
     }
+
 
     fun updateValidPositions() {
         val currentGame = _game.value ?: return

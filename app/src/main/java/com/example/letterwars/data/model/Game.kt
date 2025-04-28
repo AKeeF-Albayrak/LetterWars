@@ -19,6 +19,7 @@ data class Game(
     val currentLetters: MutableList<String> = mutableListOf(),
     val moveHistory: MutableList<Move> = mutableListOf(),
     val winnerId: String? = null,
-    val pendingMoves: Map<String, String> = emptyMap()
+    val pendingMoves: Map<String, String> = emptyMap(),
+    var createdAt: Long = System.currentTimeMillis()
 )
 

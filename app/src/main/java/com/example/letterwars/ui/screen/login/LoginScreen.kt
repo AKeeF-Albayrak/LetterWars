@@ -23,6 +23,7 @@ import com.example.letterwars.ui.screen.common.FloatingLettersBackground
 fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewModel()) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(false) }
     val status by viewModel.uiState.collectAsState()
 
     Box(
@@ -96,10 +97,27 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                     )
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = rememberMe,
+                        onCheckedChange = { rememberMe = it }
+                    )
+                    Text(
+                        text = "Beni Hatırla",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = { viewModel.login(username, password) },
+                    onClick = { viewModel.login(username, password, rememberMe) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

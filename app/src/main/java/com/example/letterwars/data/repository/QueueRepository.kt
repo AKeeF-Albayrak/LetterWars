@@ -1,48 +1,32 @@
-package com.example.letterwars.data.repository
-
-import com.example.letterwars.data.firebase.FirestoreGameDataSource
 import com.example.letterwars.data.firebase.FireBaseGameDataSource
+import com.example.letterwars.data.model.Game
 import com.example.letterwars.data.model.GameDuration
+import com.example.letterwars.data.model.GameStatus
 import com.google.firebase.firestore.ListenerRegistration
 
 class QueueRepository(
-    private val queueDataSource: FirestoreGameDataSource = FirestoreGameDataSource(),
     private val gameDataSource: FireBaseGameDataSource = FireBaseGameDataSource()
 ) {
 
-    suspend fun joinMatchQueue(
-        playerId: String,
-        duration: GameDuration,
-        onGameReady: (Boolean, String?) -> Unit
-    ) {
-        val (matched, opponentId, _) = queueDataSource.joinQueue(playerId, duration)
+    suspend fun findWaitingGame(duration: GameDuration) =
+        gameDataSource.findWaitingGame(duration)
 
-        if (matched && opponentId != null) {
-            val (success, gameId) = gameDataSource.createGame(
-                player1Id = opponentId,
-                player2Id = playerId,
-                duration = duration
-            )
-            onGameReady(success, gameId)
-        } else {
-            onGameReady(false, null)
+    suspend fun createWaitingGame(playerId: String, duration: GameDuration): String? =
+        gameDataSource.createWaitingGame(playerId, duration)
+
+    suspend fun joinExistingGame(game: Game, player2Id: String): Boolean {
+        return gameDataSource.tryJoinWaitingGame(game.gameId, player2Id)
+    }
+
+    suspend fun deleteOwnWaitingGame(playerId: String) {
+        val myWaitingGame = gameDataSource.findWaitingGameForPlayer(playerId)
+        if (myWaitingGame != null) {
+            gameDataSource.deleteGame(myWaitingGame.gameId)
         }
     }
 
-    suspend fun leaveMatchQueue(
-        playerId: String,
-        duration: GameDuration,
-        onLeft: (Boolean) -> Unit
-    ) {
-        val success = queueDataSource.leaveQueue(playerId, duration)
-        onLeft(success)
-    }
-
-    fun listenQueueUserCount(
-        duration: GameDuration,
-        onUpdate: (Int) -> Unit
-    ): ListenerRegistration {
-        return queueDataSource.listenQueueUserCount(duration, onUpdate)
+    suspend fun leaveMatchQueue(playerId: String) {
+        deleteOwnWaitingGame(playerId)
     }
 
     fun listenForGameForPlayer(
@@ -51,5 +35,4 @@ class QueueRepository(
     ): ListenerRegistration {
         return gameDataSource.listenForGameForPlayer(playerId, onGameFound)
     }
-
 }

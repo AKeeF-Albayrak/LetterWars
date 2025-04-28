@@ -107,20 +107,6 @@ class FireBaseGameDataSource(
         firestore.collection("games").document(game.gameId).set(game).await()
     }
 
-    suspend fun updatePendingMoves(gameId: String, pendingMoves: Map<String, String>) {
-        firestore.collection("games").document(gameId)
-            .update("pendingMoves", pendingMoves)
-    }
-
-    suspend fun confirmMove(gameId: String, board: Map<String, GameTile>) {
-        firestore.collection("games").document(gameId)
-            .update(
-                mapOf(
-                    "board" to board,
-                    "pendingMoves" to emptyMap<String, String>()
-                )
-            )
-    }
 
     fun listenGame(gameId: String, onGameChanged: (Game) -> Unit) {
         firestore.collection("games")
@@ -146,12 +132,15 @@ class FireBaseGameDataSource(
                     return@addSnapshotListener
                 }
                 if (snapshot != null && !snapshot.isEmpty) {
+                    val currentTime = System.currentTimeMillis()
                     for (doc in snapshot.documents) {
                         val game = doc.toObject(Game::class.java)
                         if (game != null) {
                             val isPlayerInGame = (game.player1Id == playerId || game.player2Id == playerId)
                             val isGameActive = (game.status == GameStatus.IN_PROGRESS)
-                            if (isPlayerInGame && isGameActive) {
+                            val isRecentlyCreated = (currentTime - (game.createdAt ?: 0)) <= 5000L
+
+                            if (isPlayerInGame && isGameActive && isRecentlyCreated) {
                                 onGameFound(game.gameId)
                                 break
                             }
@@ -160,5 +149,116 @@ class FireBaseGameDataSource(
                 }
             }
     }
+
+    suspend fun findWaitingGame(duration: GameDuration): Game? {
+        return try {
+            val snapshot = firestore.collection("games")
+                .whereEqualTo("status", GameStatus.WAITING_FOR_PLAYER.name)
+                .whereEqualTo("duration", duration)
+                .limit(1)
+                .get()
+                .await()
+
+            snapshot.documents.firstOrNull()?.toObject(Game::class.java)
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ findWaitingGame hatası: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun deleteGame(gameId: String) {
+        try {
+            firestore.collection("games")
+                .document(gameId)
+                .delete()
+                .await()
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ deleteGame hatası: ${e.message}")
+        }
+    }
+
+    suspend fun createWaitingGame(playerId: String, duration: GameDuration): String? {
+        return try {
+            val gameId = UUID.randomUUID().toString()
+
+            val letterPool = generateLetterPool()
+            val drawnLetters = drawLetters(letterPool, 7)
+
+            val game = Game(
+                gameId = gameId,
+                player1Id = playerId,
+                currentTurnPlayerId = playerId,
+                status = GameStatus.WAITING_FOR_PLAYER,
+                duration = duration,
+                startTimeMillis = System.currentTimeMillis(),
+                expireTimeMillis = 0L,
+                board = generateEmptyBoard().toMutableMap(),
+                remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
+                currentLetters = drawnLetters.map { it.toString() }.toMutableList(),
+                moveHistory = mutableListOf(),
+                createdAt = System.currentTimeMillis()
+            )
+
+            firestore.collection("games").document(gameId).set(game).await()
+            gameId
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ createWaitingGame hatası: ${e.message}")
+            null
+        }
+    }
+
+
+    suspend fun findWaitingGameForPlayer(playerId: String): Game? {
+        return try {
+            val snapshot = firestore.collection("games")
+                .whereEqualTo("player1Id", playerId)
+                .whereEqualTo("status", GameStatus.WAITING_FOR_PLAYER.name)
+                .limit(1)
+                .get()
+                .await()
+
+            snapshot.documents.firstOrNull()?.toObject(Game::class.java)
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ findWaitingGameForPlayer hatası: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun tryJoinWaitingGame(gameId: String, player2Id: String): Boolean {
+        return try {
+            val gameRef = firestore.collection("games").document(gameId)
+            val snapshot = gameRef.get().await()
+            val game = snapshot.toObject(Game::class.java)
+
+            if (game != null && game.player2Id.isEmpty() && game.status == GameStatus.WAITING_FOR_PLAYER) {
+                val updatedGame = game.copy(
+                    player2Id = player2Id,
+                    currentTurnPlayerId = game.player1Id,
+                    status = GameStatus.IN_PROGRESS,
+                    startTimeMillis = System.currentTimeMillis(),
+                    expireTimeMillis = System.currentTimeMillis() + (game.duration.minutes * 60 * 1000)
+                )
+                gameRef.set(updatedGame).await()
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+
+    suspend fun updateBoardAndPendingMoves(gameId: String, board: Map<String, GameTile>, pendingMoves: Map<String, String>) {
+        firestore.collection("games").document(gameId)
+            .update(
+                mapOf(
+                    "board" to board,
+                    "pendingMoves" to pendingMoves
+                )
+            )
+            .await()
+    }
+
 
 }

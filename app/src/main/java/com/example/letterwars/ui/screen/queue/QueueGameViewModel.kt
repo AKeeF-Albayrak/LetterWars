@@ -2,7 +2,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.letterwars.data.model.GameDuration
-import com.example.letterwars.data.repository.QueueRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.delay
@@ -31,11 +30,10 @@ class QueueViewModel(
     val queueUserCount: StateFlow<Int> = _queueUserCount
 
     private var gameListener: ListenerRegistration? = null
-    private var queueListener: ListenerRegistration? = null
+    private var checkingJob = false
 
     init {
         joinQueue()
-        startListeningQueueUserCount()
         listenForGameMatch()
     }
 
@@ -49,34 +47,60 @@ class QueueViewModel(
     }
 
     private fun joinQueue() = viewModelScope.launch {
-        while (_isSearching.value) {
-            repo.joinMatchQueue(playerId, gameDuration) { ready, gameId ->
-                if (ready && gameId != null) {
-                    _gameId.value = gameId
-                    _isSearching.value = false
+        val waitingGame = repo.findWaitingGame(gameDuration)
+
+        if (waitingGame != null && waitingGame.player1Id != playerId) {
+            val joined = repo.joinExistingGame(waitingGame, playerId)
+            if (joined) {
+                _gameId.value = waitingGame.gameId
+                _isSearching.value = false
+            } else {
+                // Eğer başkası katıldıysa, tekrar beklemeye devam
+                val myWaitingGameId = repo.createWaitingGame(playerId, gameDuration)
+                if (myWaitingGameId != null) {
+                    _isSearching.value = true
+                    startCheckingForOtherGames()
                 }
             }
-            delay(2000L)
+        } else {
+            val myWaitingGameId = repo.createWaitingGame(playerId, gameDuration)
+            if (myWaitingGameId != null) {
+                _isSearching.value = true
+                startCheckingForOtherGames()
+            }
         }
     }
 
-    private fun startListeningQueueUserCount() {
-        queueListener = repo.listenQueueUserCount(gameDuration) { count ->
-            _queueUserCount.value = count
+
+    private fun startCheckingForOtherGames() {
+        if (checkingJob) return
+        checkingJob = true
+
+        viewModelScope.launch {
+            while (_isSearching.value) {
+                delay(5000L)
+                val waitingGame = repo.findWaitingGame(gameDuration)
+                if (waitingGame != null && waitingGame.player1Id != playerId) {
+                    repo.joinExistingGame(waitingGame, playerId)
+                    repo.deleteOwnWaitingGame(playerId)
+                    _gameId.value = waitingGame.gameId
+                    _isSearching.value = false
+                    break
+                }
+            }
         }
     }
 
     fun leaveQueue() = viewModelScope.launch {
-        repo.leaveMatchQueue(playerId, gameDuration) { /* ignore result */ }
+        repo.leaveMatchQueue(playerId)
         _isSearching.value = false
     }
 
     override fun onCleared() {
+        super.onCleared()
         viewModelScope.launch {
             leaveQueue()
         }
-        queueListener?.remove()
         gameListener?.remove()
-        super.onCleared()
     }
 }
