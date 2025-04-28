@@ -1,5 +1,8 @@
 package com.example.letterwars.ui.screen.profile
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -7,18 +10,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.letterwars.data.model.User
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,57 +32,107 @@ fun UserProfileScreen(
     onSignedOut: () -> Unit
 ) {
     val user by viewModel.user.collectAsState()
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        visible = true
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Profil") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+            Column {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "Profil",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF3E3E3E)
+                            )
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFFBB86FC).copy(alpha = 0.2f))
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Geri",
+                                tint = Color(0xFF6A1B9A)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    )
                 )
-            )
-        }
+                Divider(color = Color.LightGray, thickness = 1.dp)
+            }
+        },
+        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(16.dp)
         ) {
-            // Kullanıcı profil kısmı
-            user?.let { u ->
-                ProfileHeader(u)
-                Spacer(modifier = Modifier.height(24.dp))
-                StatsSection(u)
-            } ?: CircularProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 32.dp)
-                    .wrapContentWidth(Alignment.CenterHorizontally)
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Çıkış Yap düğmesi
-            Button(
-                onClick = {
-                    viewModel.signOut()
-                    onSignedOut()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                )
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
             ) {
-                Text("Çıkış Yap")
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Kullanıcı profil kısmı
+                    user?.let { u ->
+                        ProfileHeader(u)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        StatsSection(u)
+                    } ?: Box(
+                        modifier = Modifier.fillMaxWidth().height(300.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF6A1B9A))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Çıkış Yap düğmesi
+                    ElevatedButton(
+                        onClick = {
+                            viewModel.signOut()
+                            onSignedOut()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp),
+                        colors = ButtonDefaults.elevatedButtonColors(
+                            containerColor = Color(0xFFF44336), // Kırmızı
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.ExitToApp, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Çıkış Yap",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -88,25 +142,28 @@ fun UserProfileScreen(
 private fun ProfileHeader(user: User) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFFFD54F) // HomeScreen'deki UserInfoCard ile aynı renk
+        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Profil avatarı
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(96.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(Color(0xFF9575CD).copy(alpha = 0.3f)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = user.username.firstOrNull()?.toString() ?: "?",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.displayMedium,
+                    color = Color(0xFF6A1B9A),
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -117,11 +174,11 @@ private fun ProfileHeader(user: User) {
             Text(
                 text = user.username,
                 style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF333333)
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Email
             Row(
@@ -130,14 +187,14 @@ private fun ProfileHeader(user: User) {
                 Icon(
                     Icons.Default.Email,
                     contentDescription = "Email",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Color(0xFF6A1B9A),
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = user.email,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = Color(0xFF757575)
                 )
             }
         }
@@ -150,37 +207,44 @@ private fun StatsSection(user: User) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(16.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(24.dp)
         ) {
             Text(
                 text = "Oyun İstatistikleri",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = Color(0xFF3E3E3E),
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // İstatistikler - basitleştirilmiş tasarım
+            // İstatistikler - geliştirilmiş tasarım
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                SimpleStatItem(
+                EnhancedStatItem(
                     value = user.totalGames.toString(),
-                    label = "Toplam Oyun"
+                    label = "Toplam Oyun",
+                    color = Color(0xFF9575CD)
                 )
 
-                SimpleStatItem(
+                EnhancedStatItem(
                     value = user.wonGames.toString(),
-                    label = "Kazanılan"
+                    label = "Kazanılan",
+                    color = Color(0xFF4CAF50)
                 )
 
-                SimpleStatItem(
+                EnhancedStatItem(
                     value = "%$winRate",
-                    label = "Başarı Oranı"
+                    label = "Başarı Oranı",
+                    color = Color(0xFFFF8A65)
                 )
             }
         }
@@ -188,24 +252,35 @@ private fun StatsSection(user: User) {
 }
 
 @Composable
-private fun SimpleStatItem(value: String, label: String) {
+private fun EnhancedStatItem(value: String, label: String, color: Color) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = 8.dp)
     ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+                color = color
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            color = Color(0xFF757575),
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Medium
         )
     }
 }

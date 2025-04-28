@@ -16,14 +16,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             LetterWarsTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val navController = rememberNavController()
-                    AppNavGraph(navController = navController)
-                }
+                val navController = rememberNavController()
+                AppNavGraph(navController = navController)
             }
         }
     }
+
 }

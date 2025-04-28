@@ -1,7 +1,10 @@
 package com.example.letterwars.ui.screen.queue
 
 import QueueViewModel
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -16,8 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.ui.screen.common.FloatingLettersBackground
@@ -33,6 +34,12 @@ fun QueueScreen(
     var elapsedTime by remember { mutableStateOf(0L) }
     var isInQueue by remember { mutableStateOf(true) }
     var showMatchFoundCard by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(100)
+        visible = true
+    }
 
     val gameDuration = viewModel.gameDuration
     val gameDurationText = when {
@@ -67,7 +74,6 @@ fun QueueScreen(
         }
     }
 
-
     val infiniteTransition = rememberInfiniteTransition(label = "pulsating")
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.8f,
@@ -82,176 +88,196 @@ fun QueueScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color(0xFFFFF8E1)) // Beyaza yakın sıcak arka plan
     ) {
         FloatingLettersBackground()
 
-        Card(
+        Box(
             modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth()
-                .align(Alignment.Center),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-            )
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
             ) {
-                Text(
-                    text = "Oyun Aranıyor",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                        containerColor = Color.White.copy(alpha = 0.95f)
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Seçilen Oyun Süresi",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
+                            text = "Oyun Aranıyor",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF6A1B9A) // Ana mor renk
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Text(
-                            text = gameDurationText,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFE1BEE7) // Açık mor arka plan
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Seçilen Oyun Süresi",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF757575)
+                                )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
 
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp * scale)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                                Text(
+                                    text = gameDurationText,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF6A1B9A)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Animasyonlu daireler
                         Box(
                             modifier = Modifier
-                                .size(60.dp * scale)
+                                .size(120.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                                .background(Color(0xFFBB86FC).copy(alpha = 0.1f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(100.dp * scale)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary)
-                            )
+                                    .background(Color(0xFFBB86FC).copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(60.dp * scale)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFBB86FC).copy(alpha = 0.3f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF6A1B9A))
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "Bekleme Süresi",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = formattedTime,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Tahmini Bekleme: 01:30",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
                         Text(
-                            text = "Sıradaki Oyuncular",
+                            text = "Bekleme Süresi",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            color = Color(0xFF757575)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        val queueUserCount by viewModel.queueUserCount.collectAsState()
-
                         Text(
-                            text = queueUserCount.toString(),
-                            style = MaterialTheme.typography.headlineMedium,
+                            text = formattedTime,
+                            style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF6A1B9A)
                         )
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "Tahmini Bekleme: 01:30",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF757575)
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFF3E5F5) // Çok açık mor
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Sıradaki Oyuncular",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF757575)
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val queueUserCount by viewModel.queueUserCount.collectAsState()
+
+                                Text(
+                                    text = queueUserCount.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF6A1B9A)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        ElevatedButton(
+                            onClick = {
+                                isInQueue = false
+                                viewModel.leaveQueue()
+                                navController.popBackStack()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(60.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.elevatedButtonColors(
+                                containerColor = Color(0xFFF44336), // Kırmızı
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                "Sıradan Çık",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        isInQueue = false
-                        viewModel.leaveQueue()
-                        navController.popBackStack()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text(
-                        "Sıradan Çık",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             }
         }
+
         if (showMatchFoundCard) {
             Card(
                 modifier = Modifier
@@ -259,7 +285,7 @@ fun QueueScreen(
                     .padding(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = Color(0xFFE8F5E9) // Açık yeşil arka plan
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -273,7 +299,7 @@ fun QueueScreen(
                         text = "🎉 Karşılaşma Bulundu!",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = Color(0xFF4CAF50) // Yeşil metin
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -281,7 +307,7 @@ fun QueueScreen(
                     Text(
                         text = "Hazırlanıyor...",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = Color(0xFF388E3C) // Daha koyu yeşil metin
                     )
                 }
             }
