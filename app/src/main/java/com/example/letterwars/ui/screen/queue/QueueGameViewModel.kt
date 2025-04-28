@@ -47,27 +47,22 @@ class QueueViewModel(
     }
 
     private fun joinQueue() = viewModelScope.launch {
-        // İlk 5 saniye boyunca bekle ve başkalarının oyunlarını ara
-        val searchStartTime = System.currentTimeMillis()
-        val searchDurationMillis = 5000L
-        var foundGame = false
+        val waitingGame = repo.findWaitingGame(gameDuration)
 
-        while (System.currentTimeMillis() - searchStartTime < searchDurationMillis) {
-            val waitingGame = repo.findWaitingGame(gameDuration)
-            if (waitingGame != null && waitingGame.player1Id != playerId) {
-                val joined = repo.joinExistingGame(waitingGame, playerId)
-                if (joined) {
-                    _gameId.value = waitingGame.gameId
-                    _isSearching.value = false
-                    foundGame = true
-                    break
+        if (waitingGame != null && waitingGame.player1Id != playerId) {
+            val joined = repo.joinExistingGame(waitingGame, playerId)
+            if (joined) {
+                _gameId.value = waitingGame.gameId
+                _isSearching.value = false
+            } else {
+                // Eğer başkası katıldıysa, tekrar beklemeye devam
+                val myWaitingGameId = repo.createWaitingGame(playerId, gameDuration)
+                if (myWaitingGameId != null) {
+                    _isSearching.value = true
+                    startCheckingForOtherGames()
                 }
             }
-            delay(500L) // Küçük bir delay koyarak sürekli sorgulamak
-        }
-
-        // Eğer 5 saniye içinde kimseyi bulamadıysak kendi oyunumuzu oluşturalım
-        if (!foundGame) {
+        } else {
             val myWaitingGameId = repo.createWaitingGame(playerId, gameDuration)
             if (myWaitingGameId != null) {
                 _isSearching.value = true
@@ -86,14 +81,11 @@ class QueueViewModel(
                 delay(5000L)
                 val waitingGame = repo.findWaitingGame(gameDuration)
                 if (waitingGame != null && waitingGame.player1Id != playerId) {
-                    // Başkasıyla eşleştiysek, kendi açtığımız waitingGame'i silelim
+                    repo.joinExistingGame(waitingGame, playerId)
                     repo.deleteOwnWaitingGame(playerId)
-                    val joined = repo.joinExistingGame(waitingGame, playerId)
-                    if (joined) {
-                        _gameId.value = waitingGame.gameId
-                        _isSearching.value = false
-                        break
-                    }
+                    _gameId.value = waitingGame.gameId
+                    _isSearching.value = false
+                    break
                 }
             }
         }

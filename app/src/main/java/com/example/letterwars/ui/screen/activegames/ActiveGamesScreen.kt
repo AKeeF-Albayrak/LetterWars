@@ -98,7 +98,10 @@ fun ActiveGamesScreen(
                     }
                     is ActiveGamesUiState.Success -> {
                         ActiveGamesList(
-                            games = state.gameInfoList
+                            games = state.gameInfoList,
+                            onContinue = { gameId ->
+                                navController.navigate("game/$gameId") // rotanızı buraya koyun
+                            }
                         )
                     }
                     is ActiveGamesUiState.Error -> {
@@ -161,6 +164,7 @@ fun ActiveGamesScreen(
 @Composable
 private fun ActiveGamesList(
     games: List<ActiveGameInfo>,
+    onContinue: (String) -> Unit,                 // <<<
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -168,75 +172,98 @@ private fun ActiveGamesList(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(games) { game ->
-            ActiveGameItem(game)
+            ActiveGameItem(game, onContinue)      // <<<
         }
     }
 }
 
 @Composable
-private fun ActiveGameItem(info: ActiveGameInfo) {
-    val yourTurn = info.isYourTurn
-    val backgroundColor = if (yourTurn) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
+private fun ActiveGameItem(
+    info: ActiveGameInfo,
+    onContinue: (String) -> Unit                  // <<<
+) {
+    val yourTurn       = info.isYourTurn
+    val backgroundTint = if (yourTurn) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    text = "Başlangıç Tarihi",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFF757575) // Hafif gri
-                    )
-                )
+        Column(modifier = Modifier.padding(16.dp)) {
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = formatDate(info.startedAt),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E3E3E)
-                    )
-                )
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
-                val turnText = if (yourTurn) "Sıra Sende" else "Rakipte"
-                val turnColor = if (yourTurn) Color(0xFF4CAF50) else Color(0xFF9575CD)
-
-                Box(
-                    modifier = Modifier
-                        .background(if (yourTurn) Color(0xFFE8F5E9) else Color(0xFFF3E5F5), shape = RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
+            /* ---------- üst satır ---------- */
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
                     Text(
-                        text = turnText,
-                        color = turnColor,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Başlangıç Tarihi",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color(0xFF757575)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = formatDate(info.startedAt),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF3E3E3E)
+                        )
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    val turnText  = if (yourTurn) "Sıra Sende" else "Rakipte"
+                    val turnColor = if (yourTurn) Color(0xFF4CAF50) else Color(0xFF9575CD)
 
-                Text(
-                    text = info.remainingTimeLabel,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Medium
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (yourTurn) Color(0xFFE8F5E9) else Color(0xFFF3E5F5),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = turnText,
+                            color = turnColor,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = info.remainingTimeLabel,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Medium
+                        )
                     )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            /* ---------- Devam Et butonu ---------- */
+            ElevatedButton(
+                onClick  = { onContinue(info.gameId) },
+                enabled  = yourTurn,                       // sadece sıra sende iken tıklanabilir
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.elevatedButtonColors(
+                    containerColor = if (yourTurn) Color(0xFF4CAF50) else Color.LightGray,
+                    contentColor   = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Devam Et",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
             }
         }

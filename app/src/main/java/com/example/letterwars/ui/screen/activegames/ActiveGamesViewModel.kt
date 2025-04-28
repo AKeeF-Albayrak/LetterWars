@@ -57,8 +57,9 @@ class ActiveGamesViewModel : ViewModel() {
                 val expires  = d.getLong("expireTimeMillis") ?: now
                 val isMyTurn = d.getString("currentTurnPlayerId") == uid
                 val remainingLabel = formatRemaining(expires - now)
+                val id       = d.id
 
-                ActiveGameInfo(started, isMyTurn, remainingLabel)
+                ActiveGameInfo(started, isMyTurn, remainingLabel, id)
             }.sortedByDescending { it.startedAt }
 
             _uiState.value =
