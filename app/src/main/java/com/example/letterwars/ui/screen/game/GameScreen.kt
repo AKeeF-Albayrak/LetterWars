@@ -354,7 +354,11 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             val currentPosition = dragStartPosition + dragOffset
                             val targetCell = findCellAtPosition(currentPosition)
 
-                            if (targetCell != null && !(targetCell.row == 7 && targetCell.col == 7)) {
+                            if (
+                                targetCell != null &&
+                                !(targetCell.row == 7 && targetCell.col == 7) &&
+                                validPlacementPositions.contains(targetCell)
+                            ) {
                                 draggedLetter?.let { letter ->
                                     placeLetter(
                                         RackLetter(letter.letter, letter.points),
