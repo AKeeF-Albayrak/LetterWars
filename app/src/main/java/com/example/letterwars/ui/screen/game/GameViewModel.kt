@@ -231,33 +231,164 @@ class GameViewModel(
     fun updateValidPositions() {
         val currentGame = _game.value ?: return
         val board = currentGame.board
+        val pendingMoves = currentGame.pendingMoves
         val newValidPositions = mutableListOf<Position>()
 
-        for (i in 0..14) {
-            for (j in 0..14) {
-                val key = "$i-$j"
-                val tile = board[key]
+        // pendingMoves üzerinden geçici taşlar
+        val placedPositions = pendingMoves.keys.mapNotNull { key ->
+            val parts = key.split("-")
+            if (parts.size == 2) {
+                val row = parts[0].toIntOrNull()
+                val col = parts[1].toIntOrNull()
+                if (row != null && col != null) Position(row, col) else null
+            } else null
+        }
 
-                if (!tile?.letter.isNullOrEmpty()) continue
+        if (placedPositions.size < 2) {
+            for (i in 0..14) {
+                for (j in 0..14) {
+                    val key = "$i-$j"
+                    val tile = board[key]
+                    if (!tile?.letter.isNullOrEmpty()) continue
+                    if (i == 7 && j == 7) {
+                        newValidPositions.add(Position(i, j))
+                        continue
+                    }
+                    val neighborOffsets = listOf(
+                        -1 to 0, 1 to 0,
+                        0 to -1, 0 to 1,
+                        -1 to -1, 1 to 1,
+                        -1 to 1, 1 to -1
+                    )
+                    if (neighborOffsets.any { (dx, dy) ->
+                            val neighborKey = "${i + dx}-${j + dy}"
+                            board[neighborKey]?.letter?.isNotEmpty() == true
+                        }
+                    ) {
+                        newValidPositions.add(Position(i, j))
+                    }
+                }
+            }
+        } else {
+            val rows = placedPositions.map { it.row }
+            val cols = placedPositions.map { it.col }
 
-                if (i == 7 && j == 7) {
-                    newValidPositions.add(Position(i, j))
-                    continue
+            val isHorizontal = rows.distinct().size == 1
+            val isVertical = cols.distinct().size == 1
+            val isDiagonal = !isHorizontal && !isVertical
+
+            if (isHorizontal) {
+                val row = rows.first()
+                var startCol = cols.minOrNull() ?: 0
+                var endCol = cols.maxOrNull() ?: 14
+
+                while (startCol > 0 && !board["$row-${startCol - 1}"]?.letter.isNullOrEmpty()) {
+                    startCol--
+                }
+                while (endCol < 14 && !board["$row-${endCol + 1}"]?.letter.isNullOrEmpty()) {
+                    endCol++
                 }
 
-                val neighborOffsets = listOf(
-                    -1 to 0, 1 to 0,
-                    0 to -1, 0 to 1,
-                    -1 to -1, 1 to 1,
-                    -1 to 1, 1 to -1
-                )
+                if (startCol > 0 && board["$row-${startCol - 1}"]?.letter.isNullOrEmpty() == true) {
+                    newValidPositions.add(Position(row, startCol - 1))
+                }
+                if (endCol < 14 && board["$row-${endCol + 1}"]?.letter.isNullOrEmpty() == true) {
+                    newValidPositions.add(Position(row, endCol + 1))
+                }
 
-                if (neighborOffsets.any { (dx, dy) ->
-                        val neighborKey = "${i + dx}-${j + dy}"
-                        board[neighborKey]?.letter?.isNotEmpty() == true
+            } else if (isVertical) {
+                val col = cols.first()
+                var startRow = rows.minOrNull() ?: 0
+                var endRow = rows.maxOrNull() ?: 14
+
+                while (startRow > 0 && !board["${startRow - 1}-$col"]?.letter.isNullOrEmpty()) {
+                    startRow--
+                }
+                while (endRow < 14 && !board["${endRow + 1}-$col"]?.letter.isNullOrEmpty()) {
+                    endRow++
+                }
+
+                if (startRow > 0 && board["${startRow - 1}-$col"]?.letter.isNullOrEmpty() == true) {
+                    newValidPositions.add(Position(startRow - 1, col))
+                }
+                if (endRow < 14 && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true) {
+                    newValidPositions.add(Position(endRow + 1, col))
+                }
+
+            } else if (isDiagonal) {
+                val direction = when {
+                    placedPositions.size < 2 -> null
+                    else -> {
+                        val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
+                        val first = sorted.first()
+                        val second = sorted[1]
+
+                        val dx = second.row - first.row
+                        val dy = second.col - first.col
+
+                        when {
+                            dx == dy -> "main" // ↘ y = x
+                            dx == -dy -> "anti" // ↙ y = -x
+                            else -> null
+                        }
                     }
-                ) {
-                    newValidPositions.add(Position(i, j))
+                }
+
+                if (direction != null) {
+                    val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
+                    var start = sorted.first()
+                    var end = sorted.last()
+
+                    // Diagonal uzatma
+                    while (true) {
+                        val next = when (direction) {
+                            "main" -> Position(start.row - 1, start.col - 1)
+                            "anti" -> Position(start.row - 1, start.col + 1)
+                            else -> break
+                        }
+                        val key = "${next.row}-${next.col}"
+                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                            start = next
+                        } else break
+                    }
+
+                    while (true) {
+                        val next = when (direction) {
+                            "main" -> Position(end.row + 1, end.col + 1)
+                            "anti" -> Position(end.row + 1, end.col - 1)
+                            else -> break
+                        }
+                        val key = "${next.row}-${next.col}"
+                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                            end = next
+                        } else break
+                    }
+
+                    // Baş boşluğu
+                    val before = when (direction) {
+                        "main" -> Position(start.row - 1, start.col - 1)
+                        "anti" -> Position(start.row - 1, start.col + 1)
+                        else -> null
+                    }
+                    if (before != null && before.row in 0..14 && before.col in 0..14) {
+                        val key = "${before.row}-${before.col}"
+                        if (board[key]?.letter.isNullOrEmpty() == true) {
+                            newValidPositions.add(before)
+                        }
+                    }
+
+                    // Son boşluğu
+                    val after = when (direction) {
+                        "main" -> Position(end.row + 1, end.col + 1)
+                        "anti" -> Position(end.row + 1, end.col - 1)
+                        else -> null
+                    }
+                    if (after != null && after.row in 0..14 && after.col in 0..14) {
+                        val key = "${after.row}-${after.col}"
+                        if (board[key]?.letter.isNullOrEmpty() == true) {
+                            newValidPositions.add(after)
+                        }
+                    }
                 }
             }
         }
@@ -269,6 +400,10 @@ class GameViewModel(
             println("Row: ${pos.row}, Col: ${pos.col}")
         }
     }
+
+
+
+
 
 
 

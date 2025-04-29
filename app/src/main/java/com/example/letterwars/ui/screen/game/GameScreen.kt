@@ -66,6 +66,9 @@ fun GameScreen(gameId: String?, navController: NavController) {
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
 
+    val currentDragTargetCell = remember { mutableStateOf<Position?>(null) }
+
+
     val selectedLetter = remember { mutableStateOf<SelectedLetter?>(null) }
 
     val isPlayerTurn by remember(gameState?.currentTurnPlayerId) {
@@ -269,6 +272,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             boardState = boardState,
                             placedLetters = placedLetters,
                             validPlacementPositions = validPlacementPositions,
+                            currentDragTargetCell = currentDragTargetCell.value,
                             onCellClick = { row, col ->
                                 selectedLetter.value?.let { selected ->
                                     if (validPlacementPositions.contains(Position(row, col)) && !(row == 7 && col == 7)) {
@@ -342,6 +346,9 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         },
                         onLetterDrag = { change, dragAmount ->
                             dragOffset += dragAmount
+                            val currentPosition = dragStartPosition + dragOffset
+                            val targetCell = findCellAtPosition(currentPosition)
+                            currentDragTargetCell.value = targetCell
                         },
                         onLetterDragEnd = {
                             val currentPosition = dragStartPosition + dragOffset
@@ -360,6 +367,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
                             draggedLetter = null
                             dragOffset = Offset.Zero
+                            currentDragTargetCell.value = null
                         },
                         onShuffle = {
                             rackLetters.shuffle()
@@ -711,6 +719,7 @@ fun GameBoard(
     boardState: List<List<GameTile>>,
     placedLetters: Map<Position, RackLetter>,
     validPlacementPositions: List<Position>,
+    currentDragTargetCell: Position?, // ← EKLE
     onCellClick: (Int, Int) -> Unit,
     onCellPositioned: (Int, Int, Offset, Size) -> Unit
 ) {
@@ -739,6 +748,8 @@ fun GameBoard(
                             isValidPlacement = isValidPlacement,
                             row = i,
                             col = j,
+                            currentDragTargetCell = currentDragTargetCell, // ← EKLE
+                            validPlacementPositions = validPlacementPositions, // ← EKLE
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
@@ -766,6 +777,8 @@ fun BoardCell(
     isValidPlacement: Boolean,
     row: Int,
     col: Int,
+    currentDragTargetCell: Position?,
+    validPlacementPositions: List<Position>,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -778,7 +791,7 @@ fun BoardCell(
         CellType.CENTER -> Color(0xFFF9E79F)
     }
 
-    val isLetterSelected = LocalSelectedLetterExists.current
+    val isLetterSelected = LocalSelectedLetterExists.current || currentDragTargetCell == Position(row, col)
     val isCenterCell = row == 7 && col == 7
     val hasLetter = placedLetter != null || !tile.letter.isNullOrEmpty()
 
@@ -834,13 +847,17 @@ fun BoardCell(
         }
 
         // Sadece harf seçiliyse ve hücrede harf yoksa ve merkez hücre değilse nokta göster
-        if (isLetterSelected && !hasLetter && !isCenterCell) {
+        if ((isLetterSelected || currentDragTargetCell == Position(row, col)) &&
+            !hasLetter && !isCenterCell) {
+
+            val isValidTarget = validPlacementPositions.contains(Position(row, col))
+
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isValidPlacement) Color.Green.copy(alpha = 0.7f)
+                        if (isValidTarget) Color.Green.copy(alpha = 0.7f)
                         else Color.Red.copy(alpha = 0.7f)
                     )
             )
