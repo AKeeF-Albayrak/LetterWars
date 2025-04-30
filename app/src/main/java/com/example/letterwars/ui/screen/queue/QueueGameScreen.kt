@@ -1,6 +1,7 @@
 package com.example.letterwars.ui.screen.queue
 
 import QueueViewModel
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
@@ -62,15 +63,20 @@ fun QueueScreen(
         }
     }
 
+    // Oyun ID'sini dinliyoruz
     val gameId by viewModel.gameId.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
 
-    LaunchedEffect(gameId) {
-        val currentGameId = gameId
-        if (currentGameId != null) {
+    // gameId veya isSearching değiştiğinde bildirimi göster
+    LaunchedEffect(gameId, isSearching) {
+        Log.d("QueueScreen", "🔵 LaunchedEffect: gameId=$gameId, isSearching=$isSearching")
+
+        if (gameId != null && !isSearching) {
+            Log.d("QueueScreen", "🟢 Maç bulundu! gameId=$gameId")
             isInQueue = false
             showMatchFoundCard = true
             delay(2000L)
-            onMatchFound(currentGameId)
+            onMatchFound(gameId!!)
         }
     }
 

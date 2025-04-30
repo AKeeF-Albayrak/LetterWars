@@ -29,10 +29,27 @@ class QueueRepository(
         deleteOwnWaitingGame(playerId)
     }
 
+    /**
+     * Firebase listener ile bir oyuncunun eşleştiği aktif oyunları dinler.
+     * Her iki oyuncu için de çalışır.
+     */
     fun listenForGameForPlayer(
         playerId: String,
         onGameFound: (String?) -> Unit
     ): ListenerRegistration {
         return gameDataSource.listenForGameForPlayer(playerId, onGameFound)
+    }
+
+    /**
+     * Belirli süre için bekleyen kullanıcı sayısını getirir
+     */
+    suspend fun getQueueUserCount(duration: GameDuration): Int {
+        // Bu fonksiyonu FireBaseGameDataSource'a ekleyin
+        return try {
+            val waitingGames = gameDataSource.getWaitingGamesCount(duration)
+            waitingGames
+        } catch (e: Exception) {
+            0 // Hata durumunda 0 dön
+        }
     }
 }
