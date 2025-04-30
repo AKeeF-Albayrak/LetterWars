@@ -7,7 +7,6 @@ import com.example.letterwars.data.util.generateEmptyBoard
 import com.example.letterwars.data.util.generateLetterPool
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Transaction
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
@@ -41,6 +40,7 @@ class FireBaseGameDataSource(
                 remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
                 currentLetters = drawnLetters.map { it.toString() }.toMutableList()
             )
+
 
             firestore.collection("games").document(gameId).set(game).await()
             Pair(true, gameId)
@@ -107,6 +107,7 @@ class FireBaseGameDataSource(
         firestore.collection("games").document(game.gameId).set(game).await()
     }
 
+
     fun listenGame(gameId: String, onGameChanged: (Game) -> Unit) {
         firestore.collection("games")
             .document(gameId)
@@ -124,6 +125,7 @@ class FireBaseGameDataSource(
         playerId: String,
         onGameFound: (String) -> Unit
     ): ListenerRegistration {
+        val firestore = FirebaseFirestore.getInstance()
         return firestore.collection("games")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -136,9 +138,9 @@ class FireBaseGameDataSource(
                         if (game != null) {
                             val isPlayerInGame = (game.player1Id == playerId || game.player2Id == playerId)
                             val isGameActive = (game.status == GameStatus.IN_PROGRESS)
-                            val isRecentlyCreated = (currentTime - (game.createdAt ?: 0)) <= 10000L // 10 saniye için daha toleranslı
+                            val isRecentlyCreated = (currentTime - (game.createdAt ?: 0)) <= 5000L
 
-                            if (isPlayerInGame && isGameActive) {
+                            if (isPlayerInGame && isGameActive && isRecentlyCreated) {
                                 onGameFound(game.gameId)
                                 break
                             }
@@ -152,7 +154,7 @@ class FireBaseGameDataSource(
         return try {
             val snapshot = firestore.collection("games")
                 .whereEqualTo("status", GameStatus.WAITING_FOR_PLAYER.name)
-                .whereEqualTo("duration", duration.name) // Doğru enum değerini kullanın
+                .whereEqualTo("duration", duration)
                 .limit(1)
                 .get()
                 .await()
@@ -205,6 +207,7 @@ class FireBaseGameDataSource(
         }
     }
 
+
     suspend fun findWaitingGameForPlayer(playerId: String): Game? {
         return try {
             val snapshot = firestore.collection("games")
@@ -223,34 +226,28 @@ class FireBaseGameDataSource(
 
     suspend fun tryJoinWaitingGame(gameId: String, player2Id: String): Boolean {
         return try {
-            // Transaction kullanarak atomik bir işlem gerçekleştirelim
-            firestore.runTransaction { transaction ->
-                val gameRef = firestore.collection("games").document(gameId)
-                val gameSnapshot = transaction.get(gameRef)
-                val game = gameSnapshot.toObject(Game::class.java)
+            val gameRef = firestore.collection("games").document(gameId)
+            val snapshot = gameRef.get().await()
+            val game = snapshot.toObject(Game::class.java)
 
-                if (game != null && game.player2Id.isEmpty() && game.status == GameStatus.WAITING_FOR_PLAYER) {
-                    // Oyun hala beklemede ve boş slot var, katılabiliriz
-                    val updatedGame = game.copy(
-                        player2Id = player2Id,
-                        currentTurnPlayerId = game.player1Id,
-                        status = GameStatus.IN_PROGRESS,
-                        startTimeMillis = System.currentTimeMillis(),
-                        expireTimeMillis = System.currentTimeMillis() + (game.duration.minutes * 60 * 1000)
-                    )
-
-                    transaction.set(gameRef, updatedGame)
-                    return@runTransaction true
-                } else {
-                    // Oyun artık uygun değil
-                    return@runTransaction false
-                }
-            }.await()
+            if (game != null && game.player2Id.isEmpty() && game.status == GameStatus.WAITING_FOR_PLAYER) {
+                val updatedGame = game.copy(
+                    player2Id = player2Id,
+                    currentTurnPlayerId = game.player1Id,
+                    status = GameStatus.IN_PROGRESS,
+                    startTimeMillis = System.currentTimeMillis(),
+                    expireTimeMillis = System.currentTimeMillis() + (game.duration.minutes * 60 * 1000)
+                )
+                gameRef.set(updatedGame).await()
+                true
+            } else {
+                false
+            }
         } catch (e: Exception) {
-            Log.e("FireBaseGameDataSource", "❌ tryJoinWaitingGame hatası: ${e.message}")
             false
         }
     }
+
 
     suspend fun updateBoardAndPendingMoves(gameId: String, board: Map<String, GameTile>, pendingMoves: Map<String, String>) {
         firestore.collection("games").document(gameId)
@@ -262,4 +259,6 @@ class FireBaseGameDataSource(
             )
             .await()
     }
+
+
 }
