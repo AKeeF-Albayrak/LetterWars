@@ -1,10 +1,10 @@
 package com.example.letterwars.ui.screen.queue
 
 import QueueViewModel
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -33,55 +33,21 @@ fun QueueScreen(
     onMatchFound: (String) -> Unit
 ) {
     var elapsedTime by remember { mutableStateOf(0L) }
+    var isInQueue by remember { mutableStateOf(true) }
+    var showMatchFoundCard by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(false) }
-    var exitingQueue by remember { mutableStateOf(false) }
 
-    // ViewModel'den state'leri topla
-    val isInQueue by viewModel.isSearching.collectAsState()
-    val gameId by viewModel.gameId.collectAsState()
-    val queueUserCount by viewModel.queueUserCount.collectAsState()
-    val showMatchFoundCard = gameId != null
-
-    // UI görünürlüğü için gecikmeli animasyon
     LaunchedEffect(Unit) {
         delay(100)
         visible = true
     }
 
-    // Elapsed time sayacı
-    LaunchedEffect(isInQueue) {
-        while (isInQueue) {
-            delay(1000L)
-            elapsedTime++
-        }
-    }
-
-    // Oyun bulununca yönlendirme
-    LaunchedEffect(gameId) {
-        val currentGameId = gameId
-        if (currentGameId != null) {
-            delay(2000L) // Kullanıcıya "Eşleşme bulundu" mesajını göstermek için gecikme
-            onMatchFound(currentGameId)
-        }
-    }
-
-    // Sıradan çıkma işlemi
-    LaunchedEffect(exitingQueue) {
-        if (exitingQueue) {
-            viewModel.leaveQueue()
-            delay(500) // Animasyon için kısa bir gecikme
-            navController.popBackStack()
-        }
-    }
-
-    // Oyun süresi metni
     val gameDuration = viewModel.gameDuration
     val gameDurationText = when {
         gameDuration.minutes < 60 -> "${gameDuration.minutes} dakika"
         else -> "${gameDuration.minutes / 60} saat"
     }
 
-    // Geçen zaman formatı
     val formattedTime = remember(elapsedTime) {
         String.format(
             "%02d:%02d",
@@ -90,7 +56,30 @@ fun QueueScreen(
         )
     }
 
-    // Dairelerin titreşim animasyonu
+    LaunchedEffect(isInQueue) {
+        while (isInQueue) {
+            delay(1000L)
+            elapsedTime++
+        }
+    }
+
+    // Oyun ID'sini dinliyoruz
+    val gameId by viewModel.gameId.collectAsState()
+    val isSearching by viewModel.isSearching.collectAsState()
+
+    // gameId veya isSearching değiştiğinde bildirimi göster
+    LaunchedEffect(gameId, isSearching) {
+        Log.d("QueueScreen", "🔵 LaunchedEffect: gameId=$gameId, isSearching=$isSearching")
+
+        if (gameId != null && !isSearching) {
+            Log.d("QueueScreen", "🟢 Maç bulundu! gameId=$gameId")
+            isInQueue = false
+            showMatchFoundCard = true
+            delay(2000L)
+            onMatchFound(gameId!!)
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulsating")
     val scale by infiniteTransition.animateFloat(
         initialValue = 0.8f,
@@ -115,11 +104,9 @@ fun QueueScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Ana bekleme kartı
             AnimatedVisibility(
-                visible = visible && isInQueue && !showMatchFoundCard,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                exit = fadeOut()
+                visible = visible,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 })
             ) {
                 Card(
                     modifier = Modifier
@@ -258,6 +245,8 @@ fun QueueScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
+                                val queueUserCount by viewModel.queueUserCount.collectAsState()
+
                                 Text(
                                     text = queueUserCount.toString(),
                                     style = MaterialTheme.typography.headlineMedium,
@@ -270,7 +259,11 @@ fun QueueScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         ElevatedButton(
-                            onClick = { exitingQueue = true }, // Çıkış animasyonu tetiklemek için
+                            onClick = {
+                                isInQueue = false
+                                viewModel.leaveQueue()
+                                navController.popBackStack()
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(60.dp),
@@ -291,17 +284,11 @@ fun QueueScreen(
             }
         }
 
-        // Eşleşme bulundu kartı - AnimatedVisibility ile kontrol edilir
-        AnimatedVisibility(
-            visible = showMatchFoundCard,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center)
-        ) {
+        if (showMatchFoundCard) {
             Card(
                 modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth(0.85f),
+                    .align(Alignment.Center)
+                    .padding(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFFE8F5E9) // Açık yeşil arka plan
@@ -326,102 +313,8 @@ fun QueueScreen(
                     Text(
                         text = "Hazırlanıyor...",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFF388E3C), // Daha koyu yeşil metin
-                        fontWeight = FontWeight.Medium
+                        color = Color(0xFF388E3C) // Daha koyu yeşil metin
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // İlerleme çubuğu
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = Color(0xFF4CAF50),
-                        trackColor = Color(0xFFCCE8CF)
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Eşleşme detayları
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFCCE8CF)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Sol oyuncu
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF4CAF50)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "S",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Sen",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF388E3C)
-                                )
-                            }
-
-                            // VS
-                            Text(
-                                text = "VS",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF388E3C)
-                            )
-
-                            // Sağ oyuncu
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFF4CAF50)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "R",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Rakip",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF388E3C)
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }

@@ -2,16 +2,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.letterwars.data.model.GameDuration
-import com.example.letterwars.data.model.GameStatus
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.Job
 
 class QueueViewModel(
     savedStateHandle: SavedStateHandle,
@@ -34,64 +30,58 @@ class QueueViewModel(
     val queueUserCount: StateFlow<Int> = _queueUserCount
 
     private var gameListener: ListenerRegistration? = null
-    private var checkingJob: Job? = null
-    private val queueMutex = Mutex() // Eşzamanlılık kontrolü için mutex
+    private var checkingJob = false
 
     init {
+        // QueueUserCount verisini periyodik olarak güncelle
+        updateQueueUserCount()
+
+        // Oyuncu sıraya katılıyor
         joinQueue()
+
+        // Aynı zamanda aktif oyun var mı diye dinlemeye başla
         listenForGameMatch()
-        startQueueCountUpdater()
     }
 
-    private fun listenForGameMatch() {
-        gameListener = repo.listenForGameForPlayer(playerId) { foundGameId ->
-            viewModelScope.launch {
-                queueMutex.withLock {
-                    if (foundGameId != null && _gameId.value == null) {
-                        _gameId.value = foundGameId
-                        _isSearching.value = false
-                        // Dinleyici işi bittiğinde diğer işleri iptal et
-                        checkingJob?.cancel()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun startQueueCountUpdater() = viewModelScope.launch {
+    private fun updateQueueUserCount() = viewModelScope.launch {
         while (_isSearching.value) {
             try {
                 val count = repo.getQueueUserCount(gameDuration)
                 _queueUserCount.value = count
             } catch (e: Exception) {
-                // Hata durumunda loglama yapabiliriz
+                // Hata durumunda geçerli değeri koru
             }
-            delay(3000L) // 3 saniyede bir güncelle
+            delay(5000L) // 5 saniyede bir güncelle
+        }
+    }
+
+    private fun listenForGameMatch() {
+        gameListener = repo.listenForGameForPlayer(playerId) { foundGameId ->
+            if (foundGameId != null) {
+                _gameId.value = foundGameId
+                _isSearching.value = false
+            }
         }
     }
 
     private fun joinQueue() = viewModelScope.launch {
-        queueMutex.withLock {
-            // Önce kendi bekleyen oyunumuzu temizleyelim (varsa)
-            repo.deleteOwnWaitingGame(playerId)
+        // Önce bekleyen oyun var mı kontrol et
+        val waitingGame = repo.findWaitingGame(gameDuration)
 
-            // Bekleyen bir oyun var mı kontrol edelim
-            val waitingGame = repo.findWaitingGame(gameDuration)
-
-            if (waitingGame != null && waitingGame.player1Id != playerId) {
-                // Bekleyen oyuna katılmayı deneyelim
-                val joined = repo.joinExistingGame(waitingGame, playerId)
-                if (joined) {
-                    _gameId.value = waitingGame.gameId
-                    _isSearching.value = false
-                } else {
-                    // Eğer başkası katıldıysa, kendi oyunumuzu oluşturalım
-                    createOwnWaitingGame()
-                }
+        if (waitingGame != null && waitingGame.player1Id != playerId) {
+            // Eğer bekleyen bir oyun varsa ve bu oyuncu kendi oluşturduğu değilse, katıl
+            val joined = repo.joinExistingGame(waitingGame, playerId)
+            if (joined) {
+                // Katılım başarılı, artık oyun listeneri bize bildirimi yapacak
+                // (GameID akışı hemen güncellenmez, Firebase listener üzerinden gelir)
+                // Bu da her iki oyuncuya da bildirim gitmesini sağlar
             } else {
-                // Bekleyen oyun yoksa, kendi oyunumuzu oluşturalım
+                // Eğer katılım başarısız olduysa, yeni bir bekleyen oyun oluştur
                 createOwnWaitingGame()
             }
+        } else {
+            // Bekleyen oyun yoksa, yeni bir bekleyen oyun oluştur
+            createOwnWaitingGame()
         }
     }
 
@@ -104,68 +94,52 @@ class QueueViewModel(
     }
 
     private fun startCheckingForOtherGames() {
-        // Önceki iş varsa iptal et
-        checkingJob?.cancel()
+        if (checkingJob) return
+        checkingJob = true
 
-        checkingJob = viewModelScope.launch {
+        viewModelScope.launch {
             while (_isSearching.value) {
-                delay(2000L) // Daha sık kontrol edelim
+                delay(5000L) // 5 saniyede bir kontrol et
 
-                queueMutex.withLock {
-                    if (!_isSearching.value || _gameId.value != null) {
-                        return@withLock // Artık arama yapmıyorsak veya oyun bulunmuşsa çıkalım
-                    }
+                // Hala aktif arama yapıyorsak
+                if (!_isSearching.value) break
 
-                    // Önce kendi oyunumuzun hala aktif olup olmadığını kontrol edelim
-                    val myWaitingGame = repo.findWaitingGameForPlayer(playerId)
+                // Bekleyen başka bir oyun var mı kontrol et
+                val waitingGame = repo.findWaitingGame(gameDuration)
+                if (waitingGame != null && waitingGame.player1Id != playerId) {
+                    // Bulunduğunda katılmayı dene
+                    val success = repo.joinExistingGame(waitingGame, playerId)
+                    if (success) {
+                        // Katılmayı başardıysan, kendi bekleme oyununu sil (var ise)
+                        repo.deleteOwnWaitingGame(playerId)
 
-                    if (myWaitingGame == null) {
-                        // Kendi oyunumuz silinmiş veya değiştirilmiş, muhtemelen başka bir oyuncu katıldı
-                        // Yeni oyunlarımızı kontrol edelim
-                        val myGames = repo.findActiveGamesForPlayer(playerId)
-                        val activeGame = myGames.firstOrNull { it.status == GameStatus.IN_PROGRESS }
-
-                        if (activeGame != null) {
-                            _gameId.value = activeGame.gameId
-                            _isSearching.value = false
-                            return@withLock
-                        } else {
-                            // Hiçbir oyun bulunamadıysa, yeni bir bekleme oyunu oluşturalım
-                            createOwnWaitingGame()
-                            return@withLock
-                        }
-                    }
-
-                    // Diğer bekleyen oyunları kontrol edelim
-                    val waitingGame = repo.findWaitingGame(gameDuration)
-                    if (waitingGame != null && waitingGame.player1Id != playerId) {
-                        val joined = repo.joinExistingGame(waitingGame, playerId)
-                        if (joined) {
-                            // Başarıyla katıldık, kendi bekleme oyunumuzu temizleyelim
-                            repo.deleteOwnWaitingGame(playerId)
-                            _gameId.value = waitingGame.gameId
-                            _isSearching.value = false
-                        }
+                        // GameID'yi artık güncelleme - Firebase listener üzerinden gelecek
+                        // Bu da her iki oyuncuya da bildirim gitmesini sağlar
+                        break
                     }
                 }
             }
+            checkingJob = false
         }
     }
 
     fun leaveQueue() = viewModelScope.launch {
-        queueMutex.withLock {
-            repo.leaveMatchQueue(playerId)
-            _isSearching.value = false
-            checkingJob?.cancel()
-        }
+        repo.leaveMatchQueue(playerId)
+        _isSearching.value = false
     }
 
     override fun onCleared() {
         super.onCleared()
+
+        // ViewModel temizlendiğinde sıradan çık ve listener'ları kapat
         viewModelScope.launch {
-            leaveQueue()
+            try {
+                leaveQueue()
+            } catch (e: Exception) {
+                // Temizlik sırasında hata oluşursa görmezden gel
+            }
         }
+
         gameListener?.remove()
-        checkingJob?.cancel()
     }
 }

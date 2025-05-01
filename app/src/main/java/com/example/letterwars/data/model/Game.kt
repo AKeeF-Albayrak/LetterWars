@@ -20,6 +20,7 @@ data class Game(
     val moveHistory: MutableList<Move> = mutableListOf(),
     val winnerId: String? = null,
     val pendingMoves: Map<String, String> = emptyMap(),
-    var createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Her iki oyuncuyu da içeren liste - Firebase sorguları için kullanılacak
+    val players: List<String> = emptyList()
 )
-

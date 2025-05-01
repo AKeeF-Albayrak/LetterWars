@@ -7,7 +7,7 @@ import com.example.letterwars.data.util.generateEmptyBoard
 import com.example.letterwars.data.util.generateLetterPool
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Transaction
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
@@ -41,6 +41,7 @@ class FireBaseGameDataSource(
                 remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
                 currentLetters = drawnLetters.map { it.toString() }.toMutableList()
             )
+
 
             firestore.collection("games").document(gameId).set(game).await()
             Pair(true, gameId)
@@ -107,6 +108,7 @@ class FireBaseGameDataSource(
         firestore.collection("games").document(game.gameId).set(game).await()
     }
 
+
     fun listenGame(gameId: String, onGameChanged: (Game) -> Unit) {
         firestore.collection("games")
             .document(gameId)
@@ -120,44 +122,82 @@ class FireBaseGameDataSource(
             }
     }
 
+    // Düzeltilmiş - İki oyuncu için de eşleşme bildirimi tetikler
+    /**
+     * Bir oyuncunun aktif oyunlara katılımını dinler.
+     * Bu fonksiyon hem bekleyen (oyunu oluşturan) hem de katılan (oyuna sonradan dahil olan) oyuncu için çalışır.
+     */
+    /**
+     * Bir oyuncunun aktif oyunlara katılımını dinler.
+     * Bu versiyon daha basit ve indeks gerektirmeyen bir sorgu kullanır.
+     */
     fun listenForGameForPlayer(
         playerId: String,
-        onGameFound: (String) -> Unit
+        onGameFound: (String?) -> Unit
     ): ListenerRegistration {
+        Log.d("FireBaseGameDataSource", "🔵 listenForGameForPlayer başlatıldı: $playerId")
+
+        // Tüm oyunları dinliyoruz ve client-side filtreleme yapıyoruz
         return firestore.collection("games")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e("FireBaseGameDataSource", "❌ listenForGameForPlayer hatası: ${error.message}")
                     return@addSnapshotListener
                 }
+
                 if (snapshot != null && !snapshot.isEmpty) {
+                    Log.d("FireBaseGameDataSource", "🔵 Dinleyici: ${snapshot.size()} adet oyun bulundu")
+
+                    // Şu anki zaman
                     val currentTime = System.currentTimeMillis()
+
                     for (doc in snapshot.documents) {
                         val game = doc.toObject(Game::class.java)
                         if (game != null) {
-                            val isPlayerInGame = (game.player1Id == playerId || game.player2Id == playerId)
-                            val isGameActive = (game.status == GameStatus.IN_PROGRESS)
-                            val isRecentlyCreated = (currentTime - (game.createdAt ?: 0)) <= 10000L // 10 saniye için daha toleranslı
+                            // Bu oyun bu oyuncuyu içeriyor mu ve yeni mi başladı?
+                            val isPlayer1 = game.player1Id == playerId
+                            val isPlayer2 = game.player2Id == playerId
+                            val isInProgress = game.status == GameStatus.IN_PROGRESS
 
-                            if (isPlayerInGame && isGameActive) {
+                            // Son 30 saniye içinde başlamış oyunlar
+                            val isRecentlyStarted = (currentTime - game.startTimeMillis) < 30000L
+
+                            Log.d("FireBaseGameDataSource", "🔵 Oyun: ${game.gameId}, " +
+                                    "P1: $isPlayer1, P2: $isPlayer2, durum: ${game.status}, " +
+                                    "başlama: ${game.startTimeMillis}, şu an: $currentTime")
+
+                            if ((isPlayer1 || isPlayer2) && isInProgress && isRecentlyStarted) {
+                                Log.d("FireBaseGameDataSource", "🟢 Eşleşme bulundu: ${game.gameId}")
                                 onGameFound(game.gameId)
-                                break
+                                return@addSnapshotListener
                             }
                         }
                     }
+                } else {
+                    Log.d("FireBaseGameDataSource", "🔵 Dinleyici: Oyun bulunamadı")
                 }
             }
     }
-
+    /**
+     * Basitleştirilmiş sorgu - orderBy kısmı kaldırıldı
+     * Bu şekilde kompozit indeks gerekmeden çalışır
+     */
     suspend fun findWaitingGame(duration: GameDuration): Game? {
         return try {
+            Log.d("FireBaseGameDataSource", "🔵 findWaitingGame başlatıldı: $duration")
+
             val snapshot = firestore.collection("games")
                 .whereEqualTo("status", GameStatus.WAITING_FOR_PLAYER.name)
-                .whereEqualTo("duration", duration.name) // Doğru enum değerini kullanın
+                .whereEqualTo("duration", duration.name)
+                // orderBy kaldırıldı - indeks gerektirmez
                 .limit(1)
                 .get()
                 .await()
 
-            snapshot.documents.firstOrNull()?.toObject(Game::class.java)
+            val result = snapshot.documents.firstOrNull()?.toObject(Game::class.java)
+            Log.d("FireBaseGameDataSource", "🔵 findWaitingGame sonucu: ${result?.gameId ?: "null"}")
+
+            result
         } catch (e: Exception) {
             Log.e("FireBaseGameDataSource", "❌ findWaitingGame hatası: ${e.message}")
             null
@@ -181,6 +221,7 @@ class FireBaseGameDataSource(
 
             val letterPool = generateLetterPool()
             val drawnLetters = drawLetters(letterPool, 7)
+            val currentTime = System.currentTimeMillis()
 
             val game = Game(
                 gameId = gameId,
@@ -188,13 +229,15 @@ class FireBaseGameDataSource(
                 currentTurnPlayerId = playerId,
                 status = GameStatus.WAITING_FOR_PLAYER,
                 duration = duration,
-                startTimeMillis = System.currentTimeMillis(),
-                expireTimeMillis = 0L,
+                startTimeMillis = 0L,  // Oyun başlamadı henüz
+                expireTimeMillis = 0L, // Oyun başlamadı henüz
                 board = generateEmptyBoard().toMutableMap(),
                 remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
                 currentLetters = drawnLetters.map { it.toString() }.toMutableList(),
                 moveHistory = mutableListOf(),
-                createdAt = System.currentTimeMillis()
+                createdAt = currentTime,
+                // İki oyuncuyu listelemek için players alanı eklendi
+                players = listOf(playerId)
             )
 
             firestore.collection("games").document(gameId).set(game).await()
@@ -204,6 +247,7 @@ class FireBaseGameDataSource(
             null
         }
     }
+
 
     suspend fun findWaitingGameForPlayer(playerId: String): Game? {
         return try {
@@ -221,33 +265,67 @@ class FireBaseGameDataSource(
         }
     }
 
+    // Düzeltilmiş - İki oyuncuya da bildirim gönderecek şekilde güncelleme yapılıyor
+    /**
+     * Bekleyen bir oyuna katılmayı dener.
+     * Bu fonksiyon atomik olarak çalışır ve race condition'ları önler.
+     */
     suspend fun tryJoinWaitingGame(gameId: String, player2Id: String): Boolean {
+        Log.d("FireBaseGameDataSource", "🔵 tryJoinWaitingGame başlatıldı: gameId=$gameId, player2Id=$player2Id")
+
         return try {
-            // Transaction kullanarak atomik bir işlem gerçekleştirelim
-            firestore.runTransaction { transaction ->
-                val gameRef = firestore.collection("games").document(gameId)
-                val gameSnapshot = transaction.get(gameRef)
-                val game = gameSnapshot.toObject(Game::class.java)
+            val gameRef = firestore.collection("games").document(gameId)
 
-                if (game != null && game.player2Id.isEmpty() && game.status == GameStatus.WAITING_FOR_PLAYER) {
-                    // Oyun hala beklemede ve boş slot var, katılabiliriz
-                    val updatedGame = game.copy(
-                        player2Id = player2Id,
-                        currentTurnPlayerId = game.player1Id,
-                        status = GameStatus.IN_PROGRESS,
-                        startTimeMillis = System.currentTimeMillis(),
-                        expireTimeMillis = System.currentTimeMillis() + (game.duration.minutes * 60 * 1000)
-                    )
+            // Oyunu önce kontrol et
+            val gameSnapshot = gameRef.get().await()
+            val game = gameSnapshot.toObject(Game::class.java)
 
-                    transaction.set(gameRef, updatedGame)
-                    return@runTransaction true
-                } else {
-                    // Oyun artık uygun değil
+            if (game == null) {
+                Log.d("FireBaseGameDataSource", "❌ tryJoinWaitingGame: Oyun bulunamadı")
+                return false
+            }
+
+            if (game.status != GameStatus.WAITING_FOR_PLAYER) {
+                Log.d("FireBaseGameDataSource", "❌ tryJoinWaitingGame: Oyun bekleme durumunda değil, mevcut durum: ${game.status}")
+                return false
+            }
+
+            if (game.player2Id.isNotEmpty()) {
+                Log.d("FireBaseGameDataSource", "❌ tryJoinWaitingGame: Oyuna zaten başka bir oyuncu katılmış: ${game.player2Id}")
+                return false
+            }
+
+            // Şu anki zaman
+            val currentTime = System.currentTimeMillis()
+            val expireTime = currentTime + (game.duration.minutes * 60 * 1000)
+
+            // Transaction ile atomik güncelleme yap
+            val result = firestore.runTransaction { transaction ->
+                val freshSnapshot = transaction.get(gameRef)
+                val freshGame = freshSnapshot.toObject(Game::class.java)
+
+                if (freshGame == null ||
+                    freshGame.status != GameStatus.WAITING_FOR_PLAYER ||
+                    freshGame.player2Id.isNotEmpty()) {
                     return@runTransaction false
                 }
+
+                // Güncelleme yapılacak alanlar
+                val updates = mapOf(
+                    "player2Id" to player2Id,
+                    "status" to GameStatus.IN_PROGRESS.name,
+                    "startTimeMillis" to currentTime,
+                    "expireTimeMillis" to expireTime
+                )
+
+                transaction.update(gameRef, updates)
+                true
             }.await()
+
+            Log.d("FireBaseGameDataSource", "🔵 tryJoinWaitingGame sonuç: $result")
+            result
         } catch (e: Exception) {
-            Log.e("FireBaseGameDataSource", "❌ tryJoinWaitingGame hatası: ${e.message}")
+            Log.e("FireBaseGameDataSource", "❌ tryJoinWaitingGame hatası: ${e.message}", e)
             false
         }
     }
@@ -261,5 +339,29 @@ class FireBaseGameDataSource(
                 )
             )
             .await()
+    }
+
+    /**
+     * Basitleştirilmiş bekleyen oyun sayısı sorgusu
+     * Bu şekilde kompozit indeks gerekmeden çalışır
+     */
+    suspend fun getWaitingGamesCount(duration: GameDuration): Int {
+        return try {
+            Log.d("FireBaseGameDataSource", "🔵 getWaitingGamesCount başlatıldı: $duration")
+
+            val snapshot = firestore.collection("games")
+                .whereEqualTo("status", GameStatus.WAITING_FOR_PLAYER.name)
+                .whereEqualTo("duration", duration.name)
+                .get()
+                .await()
+
+            val count = snapshot.size()
+            Log.d("FireBaseGameDataSource", "🔵 getWaitingGamesCount sonucu: $count")
+
+            count
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ getWaitingGamesCount hatası: ${e.message}")
+            0 // Hata durumunda 0 dön
+        }
     }
 }
