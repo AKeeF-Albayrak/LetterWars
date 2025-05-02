@@ -4,10 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.letterwars.data.model.Game
-import com.example.letterwars.data.model.GameTile
-import com.example.letterwars.data.model.Move
-import com.example.letterwars.data.model.Position
+import com.example.letterwars.data.model.*
 import com.example.letterwars.data.repository.GameRepository
 import com.example.letterwars.data.repository.UserRepository
 import com.example.letterwars.data.util.calculateScore
@@ -36,9 +33,19 @@ class GameViewModel(
 
     private val userRepository = UserRepository()
 
-
     private val _validPositions = MutableStateFlow<List<Position>>(emptyList())
     val validPositions: StateFlow<List<Position>> = _validPositions
+
+    // Tetiklenen özel efektleri takip etmek için yeni bir StateFlow
+    private val _triggeredEffects = MutableStateFlow<List<TriggeredEffect>>(emptyList())
+    val triggeredEffects: StateFlow<List<TriggeredEffect>> = _triggeredEffects
+
+    // Tetiklenen efektleri temsil eden veri sınıfı
+    data class TriggeredEffect(
+        val position: Position,
+        val mineType: MineType?,
+        val rewardType: RewardType?
+    )
 
     fun listenGameChanges(gameId: String) {
         repository.listenGame(gameId) { updatedGame ->
@@ -64,7 +71,6 @@ class GameViewModel(
             _opponentUsername.value = opponentUser?.username ?: opponentUser?.email ?: "Rakip"
         }
     }
-
 
     fun SurrenderGame(game: Game, loserId: String) {
         viewModelScope.launch {
@@ -137,19 +143,36 @@ class GameViewModel(
         }
     }
 
-
-
     fun confirmMove(placedLetters: Map<Position, RackLetter>) {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
             val context = getApplication<Application>().applicationContext
 
+            // Tetiklenen efektleri topla
+            val triggeredEffectsList = mutableListOf<TriggeredEffect>()
+
             // 1. Tahtayı güncelle
             val updatedBoard = currentGame.board.toMutableMap()
             placedLetters.forEach { (pos, rackLetter) ->
                 val key = "${pos.row}-${pos.col}"
+                val currentTile = updatedBoard[key]
+
+                // Eğer bu hücrede bir mine veya reward varsa, efektler listesine ekle
+                if (currentTile?.mineType != null || currentTile?.rewardType != null) {
+                    triggeredEffectsList.add(
+                        TriggeredEffect(
+                            position = pos,
+                            mineType = currentTile.mineType,
+                            rewardType = currentTile.rewardType
+                        )
+                    )
+                }
+
                 updatedBoard[key] = GameTile(letter = rackLetter.letter)
             }
+
+            // Tetiklenen efektleri güncelle
+            _triggeredEffects.value = triggeredEffectsList
 
             // 2. Tüm kelimeleri bul ve doğrula
             val wordList = checkWords(context, updatedBoard, placedLetters) ?: return@launch
@@ -210,8 +233,10 @@ class GameViewModel(
         }
     }
 
-
-
+    // Tetiklenen efektleri temizlemek için yeni bir fonksiyon
+    fun clearTriggeredEffects() {
+        _triggeredEffects.value = emptyList()
+    }
 
     fun passTurn() {
         viewModelScope.launch {
@@ -246,7 +271,6 @@ class GameViewModel(
             _game.value = updatedGame
         }
     }
-
 
     fun updateValidPositions() {
         val currentGame = _game.value ?: return
@@ -375,12 +399,6 @@ class GameViewModel(
             println("Row: ${pos.row}, Col: ${pos.col}")
         }
     }
-
-
-
-
-
-
 
     private fun drawLetters(pool: MutableMap<String, Int>, count: Int): List<String> {
         val available = pool.flatMap { entry -> List(entry.value) { entry.key } }.toMutableList()

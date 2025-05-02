@@ -1,6 +1,9 @@
 package com.example.letterwars.ui.screen.game
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -33,11 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.letterwars.data.model.CellType
-import com.example.letterwars.data.model.Game
-import com.example.letterwars.data.model.GameStatus
-import com.example.letterwars.data.model.GameTile
-import com.example.letterwars.data.model.Position
+import com.example.letterwars.data.model.*
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
@@ -52,6 +53,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     val viewModel: GameViewModel = viewModel()
     val gameState by viewModel.game.collectAsState()
+    val triggeredEffects by viewModel.triggeredEffects.collectAsState()
 
     LaunchedEffect(gameId) {
         if (gameId != null) {
@@ -68,6 +70,26 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     val currentDragTargetCell = remember { mutableStateOf<Position?>(null) }
 
+    // Özel efektler için state'ler
+    var showMineEffect by remember { mutableStateOf<MineType?>(null) }
+    var showRewardEffect by remember { mutableStateOf<RewardType?>(null) }
+    var currentEffectIndex by remember { mutableStateOf(0) }
+
+    // Tetiklenen efektleri göstermek için LaunchedEffect
+    LaunchedEffect(triggeredEffects) {
+        if (triggeredEffects.isNotEmpty()) {
+            // İlk efekti göster
+            currentEffectIndex = 0
+            val effect = triggeredEffects.firstOrNull()
+            if (effect != null) {
+                showMineEffect = effect.mineType
+                showRewardEffect = effect.rewardType
+            }
+        } else {
+            showMineEffect = null
+            showRewardEffect = null
+        }
+    }
 
     val selectedLetter = remember { mutableStateOf<SelectedLetter?>(null) }
 
@@ -103,9 +125,6 @@ fun GameScreen(gameId: String?, navController: NavController) {
         }
     }
 
-
-
-
     val boardState = remember(gameState?.board) {
         List(15) { row ->
             List(15) { col ->
@@ -126,10 +145,8 @@ fun GameScreen(gameId: String?, navController: NavController) {
     val placedLetters = remember { mutableStateMapOf<Position, RackLetter>() }
     val cellPositions = remember { mutableStateMapOf<Position, Pair<Offset, Size>>() }
 
-
     val placeLetter = { letter: RackLetter, rackIndex: Int, row: Int, col: Int ->
         placedLetters[Position(row, col)] = letter
-
 
         if (rackIndex != -1) {
             rackLetters[rackIndex] = RackLetter(letter = "", points = 0)
@@ -268,7 +285,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                     CompositionLocalProvider(
                         LocalSelectedLetterExists provides (selectedLetter.value != null)
                     ) {
-                        GameBoard(
+                        GameBoardWithEffects(
                             boardState = boardState,
                             placedLetters = placedLetters,
                             validPlacementPositions = validPlacementPositions,
@@ -413,6 +430,28 @@ fun GameScreen(gameId: String?, navController: NavController) {
                         }
                     }
                 }
+
+                // Özel efekt popup'ı
+                SpecialEffectPopupManager(
+                    showMineEffect = showMineEffect,
+                    showRewardEffect = showRewardEffect,
+                    onDismiss = {
+                        // Mevcut efekti temizle
+                        showMineEffect = null
+                        showRewardEffect = null
+
+                        // Bir sonraki efekte geç
+                        currentEffectIndex++
+                        if (currentEffectIndex < triggeredEffects.size) {
+                            val nextEffect = triggeredEffects[currentEffectIndex]
+                            showMineEffect = nextEffect.mineType
+                            showRewardEffect = nextEffect.rewardType
+                        } else {
+                            // Tüm efektler gösterildiyse, listeyi temizle
+                            viewModel.clearTriggeredEffects()
+                        }
+                    }
+                )
             }
         }
         if (showGameOver.value || gameState?.status == GameStatus.FINISHED) {
@@ -422,7 +461,6 @@ fun GameScreen(gameId: String?, navController: NavController) {
                 navController = navController
             )
         }
-
     }
 }
 
@@ -489,7 +527,7 @@ fun GameActionsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(70.dp), // Yüksekliği biraz artırdım
+            .height(70.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -498,7 +536,7 @@ fun GameActionsCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 8.dp), // Dikey padding ekledim
+                .padding(horizontal = 6.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -546,16 +584,16 @@ fun GameActionsCard(
 @Composable
 fun ActionButton(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     color: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier // <<< yeni parametre ekledim
+    modifier: Modifier = Modifier
 ) {
     Button(
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(containerColor = color),
         modifier = modifier
-            .height(50.dp), // sadece height garantilendi
+            .height(50.dp),
         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -590,14 +628,14 @@ fun PlayerScoreCard(
     onClick: () -> Unit = {}
 ) {
     val backgroundColor = if (isActive)
-        Color(0xFFBBDEFB) // Daha yumuşak mavi
+        Color(0xFFBBDEFB)
     else
-        Color(0xFFE0E0E0) // Daha yumuşak gri
+        Color(0xFFE0E0E0)
 
     val contentColor = if (isActive)
-        Color(0xFF1565C0) // Koyu mavi
+        Color(0xFF1565C0)
     else
-        Color(0xFF424242) // Koyu gri
+        Color(0xFF424242)
 
     Card(
         modifier = Modifier
@@ -642,7 +680,6 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
     val seconds = remainingSeconds % 60
     val hours = minutes / 60
 
-    // Ekranda nasıl göstereceğiz? Süre 1 saatten büyükse saat formatı, değilse dakika formatı
     val displayTime = if (totalSeconds >= 3600) {
         String.format("%02d:%02d", hours, minutes % 60)
     } else {
@@ -717,13 +754,284 @@ fun ClockTimer(remainingSeconds: Int, totalSeconds: Int) {
     }
 }
 
+// Mine ve Reward ikonları için bileşenler
+@Composable
+fun MineTypeIcon(type: MineType, modifier: Modifier = Modifier) {
+    val (icon, color, contentDescription) = when (type) {
+        MineType.POINT_DIVISION -> Triple(
+            Icons.Filled.KeyboardArrowDown,
+            Color(0xFFE57373), // Kırmızı
+            "Puan Bölünmesi"
+        )
+        MineType.POINT_TRANSFER -> Triple(
+            Icons.Filled.Person,
+            Color(0xFFFFB74D), // Turuncu
+            "Puan Transferi"
+        )
+        MineType.LETTER_RESET -> Triple(
+            Icons.Filled.Refresh,
+            Color(0xFFFFF176), // Sarı
+            "Harf Sıfırlama"
+        )
+        MineType.BONUS_CANCEL -> Triple(
+            Icons.Filled.Clear,
+            Color(0xFFBA68C8), // Mor
+            "Bonus İptali"
+        )
+        MineType.WORD_CANCEL -> Triple(
+            Icons.Filled.Close,
+            Color(0xFFEF5350), // Koyu Kırmızı
+            "Kelime İptali"
+        )
+    }
+
+    MineRewardIconBase(
+        icon = icon,
+        color = color,
+        contentDescription = contentDescription,
+        modifier = modifier
+    )
+}
 
 @Composable
-fun GameBoard(
+fun RewardTypeIcon(type: RewardType, modifier: Modifier = Modifier) {
+    val (icon, color, contentDescription) = when (type) {
+        RewardType.AREA_BLOCK -> Triple(
+            Icons.Filled.Star,
+            Color(0xFF4FC3F7), // Mavi
+            "Alan Bloklama"
+        )
+        RewardType.LETTER_FREEZE -> Triple(
+            Icons.Filled.Face,
+            Color(0xFF81C784), // Yeşil
+            "Harf Dondurma"
+        )
+        RewardType.EXTRA_TURN -> Triple(
+            Icons.Filled.Refresh,
+            Color(0xFFFFD54F), // Altın
+            "Ekstra Tur"
+        )
+    }
+
+    MineRewardIconBase(
+        icon = icon,
+        color = color,
+        contentDescription = contentDescription,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun MineRewardIconBase(
+    icon: ImageVector,
+    color: Color,
+    contentDescription: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.3f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = color,
+            modifier = Modifier.size(10.dp)
+        )
+    }
+}
+
+@Composable
+fun MineRewardPopup(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    color: Color,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .padding(24.dp)
+                .fillMaxWidth(0.8f),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = description,
+                    fontSize = 16.sp,
+                    color = Color.DarkGray,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = color
+                    ),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text("Tamam")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun getMineTypeInfo(type: MineType): Triple<ImageVector, Color, String> {
+    return when (type) {
+        MineType.POINT_DIVISION -> Triple(
+            Icons.Filled.KeyboardArrowDown,
+            Color(0xFFE57373),
+            "Bu hamleden kazandığınız puanlar yarıya düşürüldü!"
+        )
+        MineType.POINT_TRANSFER -> Triple(
+            Icons.Filled.Person,
+            Color(0xFFFFB74D),
+            "Bu hamleden kazandığınız puanlar rakibinize transfer edildi!"
+        )
+        MineType.LETTER_RESET -> Triple(
+            Icons.Filled.Refresh,
+            Color(0xFFFFF176),
+            "Elinizdeki harfler yenileriyle değiştirildi!"
+        )
+        MineType.BONUS_CANCEL -> Triple(
+            Icons.Filled.Clear,
+            Color(0xFFBA68C8),
+            "Bu hamledeki tüm bonus kareler etkisiz hale getirildi!"
+        )
+        MineType.WORD_CANCEL -> Triple(
+            Icons.Filled.Close,
+            Color(0xFFEF5350),
+            "Bu hamledeki kelime iptal edildi ve sıra rakibinize geçti!"
+        )
+    }
+}
+
+@Composable
+fun getRewardTypeInfo(type: RewardType): Triple<ImageVector, Color, String> {
+    return when (type) {
+        RewardType.AREA_BLOCK -> Triple(
+            Icons.Filled.Star,
+            Color(0xFF4FC3F7),
+            "Tahtada 3x3'lük bir alanı rakibinize kapatabilirsiniz!"
+        )
+        RewardType.LETTER_FREEZE -> Triple(
+            Icons.Filled.Face,
+            Color(0xFF81C784),
+            "Rakibinizin elindeki bir harfi bir tur boyunca dondurabilirsiniz!"
+        )
+        RewardType.EXTRA_TURN -> Triple(
+            Icons.Filled.Refresh,
+            Color(0xFFFFD54F),
+            "Ekstra bir tur kazandınız! Tekrar hamle yapabilirsiniz."
+        )
+    }
+}
+
+@Composable
+fun SpecialEffectPopupManager(
+    showMineEffect: MineType?,
+    showRewardEffect: RewardType?,
+    onDismiss: () -> Unit
+) {
+    var showPopup by remember { mutableStateOf(false) }
+    var popupTitle by remember { mutableStateOf("") }
+    var popupDescription by remember { mutableStateOf("") }
+    var popupIcon by remember { mutableStateOf<ImageVector?>(null) }
+    var popupColor by remember { mutableStateOf(Color.Gray) }
+
+    LaunchedEffect(showMineEffect, showRewardEffect) {
+        when {
+            showMineEffect != null -> {
+                val (icon, color, description) = getMineTypeInfo(showMineEffect)
+                popupTitle = "Mayın Etkisi!"
+                popupDescription = description
+                popupIcon = icon
+                popupColor = color
+                showPopup = true
+            }
+            showRewardEffect != null -> {
+                val (icon, color, description) = getRewardTypeInfo(showRewardEffect)
+                popupTitle = "Ödül Kazandınız!"
+                popupDescription = description
+                popupIcon = icon
+                popupColor = color
+                showPopup = true
+            }
+            else -> {
+                showPopup = false
+            }
+        }
+    }
+
+    AnimatedVisibility(
+        visible = showPopup,
+        enter = fadeIn(tween(300)),
+        exit = fadeOut(tween(300))
+    ) {
+        if (popupIcon != null) {
+            MineRewardPopup(
+                title = popupTitle,
+                description = popupDescription,
+                icon = popupIcon!!,
+                color = popupColor,
+                onDismiss = onDismiss
+            )
+        }
+    }
+}
+
+@Composable
+fun GameBoardWithEffects(
     boardState: List<List<GameTile>>,
     placedLetters: Map<Position, RackLetter>,
     validPlacementPositions: List<Position>,
-    currentDragTargetCell: Position?, // ← EKLE
+    currentDragTargetCell: Position?,
     onCellClick: (Int, Int) -> Unit,
     onCellPositioned: (Int, Int, Offset, Size) -> Unit
 ) {
@@ -746,14 +1054,14 @@ fun GameBoard(
                         val placedLetter = placedLetters[Position(i, j)]
                         val isValidPlacement = validPlacementPositions.contains(Position(i, j))
 
-                        BoardCell(
+                        BoardCellWithSpecialEffects(
                             tile = tile,
                             placedLetter = placedLetter,
                             isValidPlacement = isValidPlacement,
                             row = i,
                             col = j,
-                            currentDragTargetCell = currentDragTargetCell, // ← EKLE
-                            validPlacementPositions = validPlacementPositions, // ← EKLE
+                            currentDragTargetCell = currentDragTargetCell,
+                            validPlacementPositions = validPlacementPositions,
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
@@ -775,7 +1083,7 @@ fun GameBoard(
 }
 
 @Composable
-fun BoardCell(
+fun BoardCellWithSpecialEffects(
     tile: GameTile,
     placedLetter: RackLetter?,
     isValidPlacement: Boolean,
@@ -807,6 +1115,31 @@ fun BoardCell(
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
+        // Mine veya Reward ikonu
+        if (!hasLetter && (tile.mineType != null || tile.rewardType != null)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                when {
+                    tile.mineType != null -> {
+                        MineTypeIcon(
+                            type = tile.mineType,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    tile.rewardType != null -> {
+                        RewardTypeIcon(
+                            type = tile.rewardType,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         when {
             placedLetter != null -> {
                 Box(
@@ -873,7 +1206,7 @@ fun BoardCell(
 fun LetterRack(
     letters: MutableList<RackLetter>,
     selectedLetter: MutableState<SelectedLetter?>,
-    isPlayerTurn: Boolean,  // 🔥 Sıra sende mi kontrolü için eklendi
+    isPlayerTurn: Boolean,
     onLetterClick: (String, Int, Int) -> Unit,
     onLetterDragStart: (String, Int, Int, Offset, Offset) -> Unit,
     onLetterDrag: (change: Any, Offset) -> Unit,
@@ -1000,14 +1333,14 @@ fun LetterTile(
             .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
             .border(borderWidth, borderColor, RoundedCornerShape(6.dp))
-            .clickable(enabled = isPlayerTurn) {  // 🔥 sadece kendi sıranda tıklanabilir
+            .clickable(enabled = isPlayerTurn) {
                 onClick()
             }
             .onGloballyPositioned { coordinates ->
                 position = coordinates.positionInRoot()
             }
             .pointerInput(isPlayerTurn) {
-                if (isPlayerTurn) { // 🔥 sadece kendi sıranda sürükleyebilirsin
+                if (isPlayerTurn) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             isDragging = true
@@ -1048,7 +1381,6 @@ fun LetterTile(
 }
 
 data class Size(val width: Float, val height: Float)
-
 
 data class RackLetter(
     val letter: String,
