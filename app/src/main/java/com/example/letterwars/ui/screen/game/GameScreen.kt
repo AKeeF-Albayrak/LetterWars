@@ -843,7 +843,6 @@ private fun MineRewardIconBase(
         )
     }
 }
-
 @Composable
 fun MineRewardPopup(
     title: String,
@@ -921,7 +920,8 @@ fun MineRewardPopup(
     }
 }
 
-@Composable
+// Change these functions to be regular functions instead of Composable functions
+// This is the fix for the error on line 991
 fun getMineTypeInfo(type: MineType): Triple<ImageVector, Color, String> {
     return when (type) {
         MineType.POINT_DIVISION -> Triple(
@@ -952,7 +952,7 @@ fun getMineTypeInfo(type: MineType): Triple<ImageVector, Color, String> {
     }
 }
 
-@Composable
+// Change these functions to be regular functions instead of Composable functions
 fun getRewardTypeInfo(type: RewardType): Triple<ImageVector, Color, String> {
     return when (type) {
         RewardType.AREA_BLOCK -> Triple(
@@ -985,18 +985,22 @@ fun SpecialEffectPopupManager(
     var popupIcon by remember { mutableStateOf<ImageVector?>(null) }
     var popupColor by remember { mutableStateOf(Color.Gray) }
 
+    // Move these outside of LaunchedEffect for better composable function usage
+    val mineInfo = showMineEffect?.let { getMineTypeInfo(it) }
+    val rewardInfo = showRewardEffect?.let { getRewardTypeInfo(it) }
+
     LaunchedEffect(showMineEffect, showRewardEffect) {
         when {
-            showMineEffect != null -> {
-                val (icon, color, description) = getMineTypeInfo(showMineEffect)
+            showMineEffect != null && mineInfo != null -> {
+                val (icon, color, description) = mineInfo
                 popupTitle = "Mayın Etkisi!"
                 popupDescription = description
                 popupIcon = icon
                 popupColor = color
                 showPopup = true
             }
-            showRewardEffect != null -> {
-                val (icon, color, description) = getRewardTypeInfo(showRewardEffect)
+            showRewardEffect != null && rewardInfo != null -> {
+                val (icon, color, description) = rewardInfo
                 popupTitle = "Ödül Kazandınız!"
                 popupDescription = description
                 popupIcon = icon
