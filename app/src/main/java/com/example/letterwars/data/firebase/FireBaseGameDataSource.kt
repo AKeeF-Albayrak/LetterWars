@@ -15,42 +15,6 @@ class FireBaseGameDataSource(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    suspend fun createGame(
-        player1Id: String,
-        player2Id: String,
-        duration: GameDuration
-    ): Pair<Boolean, String?> {
-        return try {
-            val gameId = UUID.randomUUID().toString()
-
-            val firstTurnPlayerId = if (Math.random() < 0.5) player1Id else player2Id
-
-            val letterPool = generateLetterPool()
-            val drawnLetters = drawLetters(letterPool, 7)
-            val startTimeMillis = System.currentTimeMillis()
-
-            val game = Game(
-                gameId = gameId,
-                player1Id = player1Id,
-                player2Id = player2Id,
-                currentTurnPlayerId = firstTurnPlayerId,
-                duration = duration,
-                startTimeMillis = startTimeMillis,
-                expireTimeMillis = startTimeMillis + (duration.minutes * 60 * 1000),
-                board = generateEmptyBoard().toMutableMap(),
-                remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
-                currentLetters = drawnLetters.map { it.toString() }.toMutableList()
-            )
-
-
-            firestore.collection("games").document(gameId).set(game).await()
-            Pair(true, gameId)
-        } catch (e: Exception) {
-            Log.e("FireBaseGameDataSource", "❌ createGame hatası: ${e.message}")
-            Pair(false, null)
-        }
-    }
-
     suspend fun getGame(gameId: String): Game? {
         return try {
             val snapshot = firestore.collection("games")
@@ -87,7 +51,7 @@ class FireBaseGameDataSource(
         }
     }
 
-    suspend fun endGame(game: Game, winnerId: String){
+    suspend fun endGame(game: Game, winnerId: String?){
         try {
             firestore.collection("games")
                 .document(game.gameId)
@@ -122,15 +86,6 @@ class FireBaseGameDataSource(
             }
     }
 
-    // Düzeltilmiş - İki oyuncu için de eşleşme bildirimi tetikler
-    /**
-     * Bir oyuncunun aktif oyunlara katılımını dinler.
-     * Bu fonksiyon hem bekleyen (oyunu oluşturan) hem de katılan (oyuna sonradan dahil olan) oyuncu için çalışır.
-     */
-    /**
-     * Bir oyuncunun aktif oyunlara katılımını dinler.
-     * Bu versiyon daha basit ve indeks gerektirmeyen bir sorgu kullanır.
-     */
     fun listenForGameForPlayer(
         playerId: String,
         onGameFound: (String?) -> Unit
@@ -220,7 +175,8 @@ class FireBaseGameDataSource(
             val gameId = UUID.randomUUID().toString()
 
             val letterPool = generateLetterPool()
-            val drawnLetters = drawLetters(letterPool, 7)
+            val drawnLetters1 = drawLetters(letterPool, 7)
+            val drawnLetters2 = drawLetters(letterPool, 7)
             val currentTime = System.currentTimeMillis()
 
             val game = Game(
@@ -229,11 +185,12 @@ class FireBaseGameDataSource(
                 currentTurnPlayerId = playerId,
                 status = GameStatus.WAITING_FOR_PLAYER,
                 duration = duration,
-                startTimeMillis = 0L,  // Oyun başlamadı henüz
-                expireTimeMillis = 0L, // Oyun başlamadı henüz
+                startTimeMillis = 0L,
+                expireTimeMillis = 0L,
                 board = generateEmptyBoard().toMutableMap(),
                 remainingLetters = letterPool.mapKeys { it.key.toString() }.toMutableMap(),
-                currentLetters = drawnLetters.map { it.toString() }.toMutableList(),
+                currentLetters1 = drawnLetters1.map { it.toString() }.toMutableList(),
+                currentLetters2 = drawnLetters2.map { it.toString() }.toMutableList(),
                 moveHistory = mutableListOf(),
                 createdAt = currentTime,
                 // İki oyuncuyu listelemek için players alanı eklendi

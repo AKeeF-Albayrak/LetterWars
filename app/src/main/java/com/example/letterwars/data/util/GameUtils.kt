@@ -131,8 +131,6 @@ fun detectDirection(positions: Set<Position>): String? {
     return when {
         rows.size == 1 -> "horizontal"
         cols.size == 1 -> "vertical"
-        positions.all { (it.row - it.col) == (positions.first().row - positions.first().col) } -> "diagonal-main"
-        positions.all { (it.row + it.col) == (positions.first().row + positions.first().col) } -> "diagonal-anti"
         else -> null
     }
 }
@@ -158,8 +156,6 @@ fun resolveWord(
     val delta = when (direction) {
         "horizontal" -> listOf(0 to -1, 0 to 1)
         "vertical" -> listOf(-1 to 0, 1 to 0)
-        "diagonal-main" -> listOf(-1 to -1, 1 to 1)
-        "diagonal-anti" -> listOf(-1 to 1, 1 to -1)
         else -> return WordInfo("", emptyList())
     }
 
@@ -193,10 +189,8 @@ fun findCrossWords(
     val crossWords = mutableListOf<WordInfo>()
 
     val deltas = when (mainDirection) {
-        "horizontal" -> listOf(-1 to 0, 1 to 0)              // dikey
-        "vertical" -> listOf(0 to -1, 0 to 1)               // yatay
-        "diagonal-main" -> listOf(-1 to 1, 1 to -1)         // ↙ çapraz
-        "diagonal-anti" -> listOf(-1 to -1, 1 to 1)         // ↘ çapraz
+        "horizontal" -> listOf(-1 to 0, 1 to 0)
+        "vertical" -> listOf(0 to -1, 0 to 1)
         else -> return emptyList()
     }
 

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.data.model.*
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
@@ -134,9 +135,18 @@ fun GameScreen(gameId: String?, navController: NavController) {
         }
     }
 
-    val rackLetters = remember(gameState?.currentLetters) {
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val currentLetters = remember(gameState) {
+        when (currentUserId) {
+            gameState?.player1Id -> gameState?.currentLetters1
+            gameState?.player2Id -> gameState?.currentLetters2
+            else -> emptyList()
+        }
+    }
+
+    val rackLetters = remember(currentLetters) {
         mutableStateListOf<RackLetter>().apply {
-            gameState?.currentLetters?.forEach { letter ->
+            currentLetters?.forEach { letter ->
                 add(RackLetter(letter, 0))
             }
         }
