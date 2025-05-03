@@ -23,5 +23,14 @@ data class Game(
     val pendingMoves: Map<String, String> = emptyMap(),
     val createdAt: Long = System.currentTimeMillis(),
     // Her iki oyuncuyu da içeren liste - Firebase sorguları için kullanılacak
-    val players: List<String> = emptyList()
+    val players: List<String> = emptyList(),
+
+    // Ödül sistemi ile ilgili yeni alanlar
+    val areaBlockActivatedBy: String? = null,
+    val areaBlockSide: String? = null, // "left" or "right"
+    val areaBlockExpiresAt: Long? = null,
+    val frozenLetterIndices: List<Int> = emptyList(),
+    val frozenLettersPlayerId: String? = null,
+    val frozenLettersExpiresAt: Long? = null,
+    val extraTurnForPlayerId: String? = null
 )

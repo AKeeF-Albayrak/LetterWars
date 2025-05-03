@@ -1,6 +1,5 @@
 package com.example.letterwars.data.model
 
-
 data class GameTile(
     val letter: String? = null,
     val multiplier: Multiplier? = null,
