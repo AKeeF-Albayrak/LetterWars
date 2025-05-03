@@ -34,8 +34,10 @@ class FirebaseUserDataSource(
         }
     }
 
-    suspend fun updateUserStats(user: User) {
-        firestore.collection("users").document(user.uid).set(user).await()
+    suspend fun updateUserInDatabase(user: User) {
+        // Firestore örneğiyle güncelleme (örnek kod, yapınıza göre değişebilir)
+        val userRef = firestore.collection("users").document(user.uid)
+        userRef.set(user)
     }
 
 }

@@ -28,12 +28,30 @@ class HomeViewModel(
         viewModelScope.launch {
             val currentTime = System.currentTimeMillis()
 
+            // Süresi dolmuş hamleleri kontrol et
             gameRepository.checkTurnExpirationForUser(uid, currentTime)
 
-            val updatedUser = userDataSource.getUser(uid)
+            // Kullanıcıyı getir
+            val user = userDataSource.getUser(uid)
 
-            if (updatedUser != null) {
-                userDataSource.updateUserStats(updatedUser)
+            if (user != null) {
+                // Tüm oyunları getir
+                val userGames = gameRepository.getGamesByUser(uid)
+
+                // Toplam oyun ve kazanılan oyunları hesapla
+                val totalGames = userGames.count { it.status == com.example.letterwars.data.model.GameStatus.FINISHED }
+                val wonGames = userGames.count { it.winnerId == uid }
+
+                // Yeni kullanıcı nesnesi oluştur
+                val updatedUser = user.copy(
+                    totalGames = totalGames,
+                    wonGames = wonGames
+                )
+
+                // Firebase'e yaz
+                userDataSource.updateUserInDatabase(updatedUser)
+
+                // UI'a yansıt
                 _user.value = updatedUser
             }
         }

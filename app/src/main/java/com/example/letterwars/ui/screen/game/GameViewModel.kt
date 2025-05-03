@@ -2,6 +2,7 @@ package com.example.letterwars.ui.screen.game
 
 import android.app.Application
 import android.system.Os.remove
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,9 +18,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class GameViewModel(
-    application: Application,
-    private val repository: GameRepository = GameRepository()
+    application: Application
 ) : AndroidViewModel(application) {
+
+    private val repository = GameRepository()
 
     private val _game = MutableStateFlow<Game?>(null)
     val game: StateFlow<Game?> = _game
@@ -151,6 +153,7 @@ class GameViewModel(
 
             // Tetiklenen efektleri topla
             val triggeredEffectsList = mutableListOf<TriggeredEffect>()
+            println("sa")
 
             // 1. Tahtayı güncelle
             val updatedBoard = currentGame.board.toMutableMap()
@@ -175,11 +178,28 @@ class GameViewModel(
             // Tetiklenen efektleri güncelle
             _triggeredEffects.value = triggeredEffectsList
 
+            println("⏳ checkWords çağrılıyor")
             // 2. Tüm kelimeleri bul ve doğrula
             val wordList = checkWords(context, updatedBoard, placedLetters) ?: return@launch
+            println("bitmedi")
+            wordList.forEach { word ->
+                println("📝 Kelime: ${word.word}, Pozisyonlar: ${word.positions}")
+            }
 
             // 3. Puanı hesapla
             val score = calculateScore(updatedBoard, placedLetters, wordList)
+
+            val updatedPlayer1Score: Int
+            val updatedPlayer2Score: Int
+
+            if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
+                updatedPlayer1Score = currentGame.player1Score + score
+                updatedPlayer2Score = currentGame.player2Score
+            } else {
+                updatedPlayer1Score = currentGame.player1Score
+                updatedPlayer2Score = currentGame.player2Score + score
+            }
+
 
             // 4. Kullanılan harfleri çıkar
             val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
@@ -227,22 +247,23 @@ class GameViewModel(
                 remainingLetters = updatedRemainingLetters,
                 currentTurnPlayerId = nextTurnPlayerId,
                 moveHistory = updatedMoveHistory,
+                player1Score = updatedPlayer1Score,
+                player2Score = updatedPlayer2Score,
                 pendingMoves = emptyMap(),
                 startTimeMillis = currentTime,
                 expireTimeMillis = expireTime
             )
 
+
             repository.updateGame(updatedGame)
             _game.value = updatedGame
 
-            // 🧩 Oyunun bitip bitmediğini kontrol et
             val bothPlayersOutOfLetters =
                 updatedGame.currentLetters1.isEmpty() && updatedGame.currentLetters2.isEmpty()
 
             val player1OutOfLetters = updatedGame.currentLetters1.isEmpty()
             val player2OutOfLetters = updatedGame.currentLetters2.isEmpty()
 
-// Sadece biri harflerini bitirmişse ve diğeri hamle yaptıktan sonra harf kalıyorsa → oyun bitebilir
             val lastMove = updatedGame.moveHistory.lastOrNull()
             val isLastMoveEmptyWord = lastMove?.word.isNullOrEmpty()
 
@@ -397,6 +418,13 @@ class GameViewModel(
         val pendingMoves = currentGame.pendingMoves
         val newValidPositions = mutableListOf<Position>()
 
+        val centerTileEmpty = board["7-7"]?.letter.isNullOrEmpty()
+        if (centerTileEmpty && pendingMoves.isEmpty()) {
+            newValidPositions.add(Position(7, 7))
+            _validPositions.value = newValidPositions
+            return
+        }
+
         // pendingMoves üzerinden geçici taşlar
         val placedPositions = pendingMoves.keys.mapNotNull { key ->
             val parts = key.split("-")
@@ -466,6 +494,46 @@ class GameViewModel(
                         newValidPositions.add(Position(startRow - 1, col))
                     if (endRow < 14 && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true)
                         newValidPositions.add(Position(endRow + 1, col))
+                }
+                "diagonal-main", "diagonal-anti" -> {
+                    val (dr, dc) = when (direction) {
+                        "diagonal-main" -> Pair(-1, -1)
+                        "diagonal-anti" -> Pair(-1, 1)
+                        else -> return
+                    }
+                    val (dr2, dc2) = Pair(-dr, -dc) // ters yön
+
+                    var start = sorted.first()
+                    var end = sorted.last()
+
+                    // Geriye doğru uzatma
+                    while (true) {
+                        val next = Position(start.row + dr, start.col + dc)
+                        val key = "${next.row}-${next.col}"
+                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                            start = next
+                        } else break
+                    }
+
+                    // İleriye doğru uzatma
+                    while (true) {
+                        val next = Position(end.row + dr2, end.col + dc2)
+                        val key = "${next.row}-${next.col}"
+                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                            end = next
+                        } else break
+                    }
+
+                    val before = Position(start.row + dr, start.col + dc)
+                    val after = Position(end.row + dr2, end.col + dc2)
+
+                    val beforeKey = "${before.row}-${before.col}"
+                    val afterKey = "${after.row}-${after.col}"
+
+                    if (before.row in 0..14 && before.col in 0..14 && board[beforeKey]?.letter.isNullOrEmpty() == true)
+                        newValidPositions.add(before)
+                    if (after.row in 0..14 && after.col in 0..14 && board[afterKey]?.letter.isNullOrEmpty() == true)
+                        newValidPositions.add(after)
                 }
             }
         }

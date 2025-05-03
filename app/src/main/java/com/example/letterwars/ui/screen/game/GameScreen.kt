@@ -137,12 +137,13 @@ fun GameScreen(gameId: String?, navController: NavController) {
 
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val currentLetters = remember(gameState) {
-        when (currentUserId) {
+        when (gameState?.currentTurnPlayerId) {
             gameState?.player1Id -> gameState?.currentLetters1
             gameState?.player2Id -> gameState?.currentLetters2
             else -> emptyList()
         }
     }
+
 
     val rackLetters = remember(currentLetters) {
         mutableStateListOf<RackLetter>().apply {
@@ -302,7 +303,7 @@ fun GameScreen(gameId: String?, navController: NavController) {
                             currentDragTargetCell = currentDragTargetCell.value,
                             onCellClick = { row, col ->
                                 selectedLetter.value?.let { selected ->
-                                    if (validPlacementPositions.contains(Position(row, col)) && !(row == 7 && col == 7)) {
+                                    if (validPlacementPositions.contains(Position(row, col))) {
                                         placeLetter(
                                             RackLetter(selected.letter, selected.points),
                                             selected.rackIndex,

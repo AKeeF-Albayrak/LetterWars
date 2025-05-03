@@ -36,11 +36,16 @@ class FireBaseGameDataSource(
                 .get()
                 .await()
 
+            var anyGameEnded = false
+
             for (document in querySnapshot.documents) {
                 val game = document.toObject(Game::class.java) ?: continue
 
-                if (game.currentTurnPlayerId == userId && currentTimeMillis >= game.expireTimeMillis) {
-                    val loserId = userId
+                val isOpponentTurnExpired = game.currentTurnPlayerId != userId &&
+                        currentTimeMillis >= game.expireTimeMillis
+
+                if (isOpponentTurnExpired) {
+                    val loserId = game.currentTurnPlayerId
                     val winnerId = when (loserId) {
                         game.player1Id -> game.player2Id
                         game.player2Id -> game.player1Id
@@ -52,16 +57,28 @@ class FireBaseGameDataSource(
                             status = GameStatus.FINISHED,
                             winnerId = winnerId
                         )
-                        firestore.collection("games").document(game.gameId).set(updatedGame).await()
-                        return true
+
+                        firestore.collection("games")
+                            .document(game.gameId)
+                            .update(
+                                mapOf(
+                                    "status" to GameStatus.FINISHED.name,
+                                    "winnerId" to winnerId
+                                )
+                            )
+                            .await()
+
+                        anyGameEnded = true
                     }
                 }
             }
-            false // Süresi dolmuş aktif oyun yok
+
+            anyGameEnded
         } catch (e: Exception) {
-            false // Hata durumunda işlem yapılmadı
+            false
         }
     }
+
 
 
 
@@ -106,8 +123,32 @@ class FireBaseGameDataSource(
     }
 
     suspend fun updateGame(game: Game) {
-        firestore.collection("games").document(game.gameId).set(game).await()
+        try {
+            val updates = mapOf(
+                "currentTurnPlayerId" to game.currentTurnPlayerId,
+                "expireTimeMillis" to game.expireTimeMillis,
+                "startTimeMillis" to game.startTimeMillis,
+                "status" to game.status.name,
+                "board" to game.board,
+                "remainingLetters" to game.remainingLetters,
+                "currentLetters1" to game.currentLetters1,
+                "currentLetters2" to game.currentLetters2,
+                "moveHistory" to game.moveHistory,
+                "pendingMoves" to game.pendingMoves,
+                "player1Score" to game.player1Score,
+                "player2Score" to game.player2Score,
+                "winnerId" to game.winnerId
+            )
+
+            firestore.collection("games")
+                .document(game.gameId)
+                .update(updates)
+                .await()
+        } catch (e: Exception) {
+            Log.e("updateGame", "❌ Firestore güncelleme hatası: ${e.message}")
+        }
     }
+
 
 
     fun listenGame(gameId: String, onGameChanged: (Game) -> Unit) {
@@ -270,7 +311,6 @@ class FireBaseGameDataSource(
         return try {
             val gameRef = firestore.collection("games").document(gameId)
 
-            // Oyunu önce kontrol et
             val gameSnapshot = gameRef.get().await()
             val game = gameSnapshot.toObject(Game::class.java)
 
@@ -289,11 +329,9 @@ class FireBaseGameDataSource(
                 return false
             }
 
-            // Şu anki zaman
             val currentTime = System.currentTimeMillis()
             val expireTime = currentTime + (game.duration.minutes * 60 * 1000)
 
-            // Transaction ile atomik güncelleme yap
             val result = firestore.runTransaction { transaction ->
                 val freshSnapshot = transaction.get(gameRef)
                 val freshGame = freshSnapshot.toObject(Game::class.java)
@@ -304,12 +342,17 @@ class FireBaseGameDataSource(
                     return@runTransaction false
                 }
 
-                // Güncelleme yapılacak alanlar
+                // Mevcut oyunculara 2. oyuncuyu da ekle
+                val updatedPlayers = freshGame.players.toMutableList().apply {
+                    if (!contains(player2Id)) add(player2Id)
+                }
+
                 val updates = mapOf(
                     "player2Id" to player2Id,
                     "status" to GameStatus.IN_PROGRESS.name,
                     "startTimeMillis" to currentTime,
-                    "expireTimeMillis" to expireTime
+                    "expireTimeMillis" to expireTime,
+                    "players" to updatedPlayers
                 )
 
                 transaction.update(gameRef, updates)
@@ -323,6 +366,7 @@ class FireBaseGameDataSource(
             false
         }
     }
+
 
     suspend fun updateBoardAndPendingMoves(gameId: String, board: Map<String, GameTile>, pendingMoves: Map<String, String>) {
         firestore.collection("games").document(gameId)
@@ -356,6 +400,20 @@ class FireBaseGameDataSource(
         } catch (e: Exception) {
             Log.e("FireBaseGameDataSource", "❌ getWaitingGamesCount hatası: ${e.message}")
             0 // Hata durumunda 0 dön
+        }
+    }
+
+    suspend fun getGamesByUser(userId: String): List<Game> {
+        return try {
+            val snapshot = firestore.collection("games")
+                .whereArrayContains("players", userId)
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { it.toObject(Game::class.java) }
+        } catch (e: Exception) {
+            Log.e("FireBaseGameDataSource", "❌ getGamesByUser hatası: ${e.message}")
+            emptyList()
         }
     }
 }

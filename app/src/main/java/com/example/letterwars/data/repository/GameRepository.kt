@@ -35,5 +35,7 @@ class GameRepository(
         gameDataSource.checkTurnExpirationForUser(userId, currentTimeMillis )
     }
 
-
+    suspend fun getGamesByUser(userId: String): List<Game> {
+        return gameDataSource.getGamesByUser(userId)
+    }
 }
