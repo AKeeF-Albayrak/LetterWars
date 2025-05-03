@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.data.model.*
+import com.example.letterwars.data.util.letterPoints
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -145,13 +146,16 @@ fun GameScreen(gameId: String?, navController: NavController) {
     }
 
 
-    val rackLetters = remember(currentLetters) {
-        mutableStateListOf<RackLetter>().apply {
-            currentLetters?.forEach { letter ->
-                add(RackLetter(letter, 0))
-            }
+    val rackLetters = remember { mutableStateListOf<RackLetter>() }
+
+    LaunchedEffect(currentLetters) {
+        rackLetters.clear()
+        currentLetters?.forEach { letter ->
+            val point = letterPoints[letter.uppercase().first()] ?: 0
+            rackLetters.add(RackLetter(letter, point))
         }
     }
+
 
     val placedLetters = remember { mutableStateMapOf<Position, RackLetter>() }
     val cellPositions = remember { mutableStateMapOf<Position, Pair<Offset, Size>>() }
@@ -1348,9 +1352,7 @@ fun LetterTile(
             .clip(RoundedCornerShape(6.dp))
             .background(backgroundColor)
             .border(borderWidth, borderColor, RoundedCornerShape(6.dp))
-            .clickable(enabled = isPlayerTurn) {
-                onClick()
-            }
+            .clickable(enabled = isPlayerTurn) { onClick() }
             .onGloballyPositioned { coordinates ->
                 position = coordinates.positionInRoot()
             }
@@ -1378,22 +1380,24 @@ fun LetterTile(
             },
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = letter,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = points.toString(),
-                fontSize = 12.sp,
-                modifier = Modifier.offset(y = (-2).dp)
-            )
-        }
+        Text(
+            text = letter.uppercase(),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        Text(
+            text = points.toString(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+        )
     }
 }
+
 
 data class Size(val width: Float, val height: Float)
 

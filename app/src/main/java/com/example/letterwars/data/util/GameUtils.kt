@@ -213,24 +213,42 @@ fun calculateScore(
 ): Int {
     var total = 0
 
-    for (word in words) {
+    for ((index, word) in words.withIndex()) {
         var wordScore = 0
         var wordMultiplier = 1
+        var bonusCancelled = false
+
+        val isMainWord = index == 0
+        val tiles = word.positions.map { pos -> board["${pos.row}-${pos.col}"] }
+
+        // ⛔ Kelime İptali: Ana kelime iptal edilmişse → 0 puan
+        if (isMainWord && tiles.any { it?.mineType == MineType.WORD_CANCEL }) {
+            return 0
+        }
+
+        // 🟣 Bonus İptali kontrolü (ana kelime için)
+        if (isMainWord) {
+            bonusCancelled = tiles.any { it?.mineType == MineType.BONUS_CANCEL }
+        }
 
         for (pos in word.positions) {
             val tile = board["${pos.row}-${pos.col}"]
             val letter = tile?.letter?.uppercase()?.getOrNull(0) ?: continue
             val baseScore = letterPoints[letter] ?: 0
 
-            val letterScore = when (tile.cellType) {
-                CellType.DOUBLE_LETTER -> baseScore * 2
-                CellType.TRIPLE_LETTER -> baseScore * 3
-                else -> baseScore
+            val letterScore = if (bonusCancelled) {
+                baseScore
+            } else {
+                when (tile.cellType) {
+                    CellType.DOUBLE_LETTER -> baseScore * 2
+                    CellType.TRIPLE_LETTER -> baseScore * 3
+                    else -> baseScore
+                }
             }
 
             wordScore += letterScore
 
-            if (placedLetters.containsKey(pos)) {
+            if (!bonusCancelled && placedLetters.containsKey(pos)) {
                 wordMultiplier *= when (tile.cellType) {
                     CellType.DOUBLE_WORD -> 2
                     CellType.TRIPLE_WORD -> 3
@@ -239,8 +257,18 @@ fun calculateScore(
             }
         }
 
-        total += wordScore * wordMultiplier
+        var finalScore = wordScore * wordMultiplier
+
+        // 🔻 Puan Bölünmesi (ana kelime için)
+        if (isMainWord && tiles.any { it?.mineType == MineType.POINT_DIVISION }) {
+            finalScore = (finalScore * 0.3).toInt()
+        }
+
+        total += finalScore
     }
 
     return total
 }
+
+
+
