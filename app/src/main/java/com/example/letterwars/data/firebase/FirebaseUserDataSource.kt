@@ -33,4 +33,9 @@ class FirebaseUserDataSource(
             null
         }
     }
+
+    suspend fun updateUserStats(user: User) {
+        firestore.collection("users").document(user.uid).set(user).await()
+    }
+
 }

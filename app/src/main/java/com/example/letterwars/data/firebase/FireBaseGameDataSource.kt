@@ -28,6 +28,43 @@ class FireBaseGameDataSource(
         }
     }
 
+    suspend fun checkTurnExpirationForUser(userId: String, currentTimeMillis: Long): Boolean {
+        return try {
+            val querySnapshot = firestore.collection("games")
+                .whereArrayContains("players", userId)
+                .whereEqualTo("status", GameStatus.IN_PROGRESS.name)
+                .get()
+                .await()
+
+            for (document in querySnapshot.documents) {
+                val game = document.toObject(Game::class.java) ?: continue
+
+                if (game.currentTurnPlayerId == userId && currentTimeMillis >= game.expireTimeMillis) {
+                    val loserId = userId
+                    val winnerId = when (loserId) {
+                        game.player1Id -> game.player2Id
+                        game.player2Id -> game.player1Id
+                        else -> null
+                    }
+
+                    if (winnerId != null) {
+                        val updatedGame = game.copy(
+                            status = GameStatus.FINISHED,
+                            winnerId = winnerId
+                        )
+                        firestore.collection("games").document(game.gameId).set(updatedGame).await()
+                        return true
+                    }
+                }
+            }
+            false // Süresi dolmuş aktif oyun yok
+        } catch (e: Exception) {
+            false // Hata durumunda işlem yapılmadı
+        }
+    }
+
+
+
     suspend fun endGame(game: Game) {
         try {
             val winnerId = when {

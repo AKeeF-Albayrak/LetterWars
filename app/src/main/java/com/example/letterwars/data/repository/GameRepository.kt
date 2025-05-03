@@ -31,5 +31,9 @@ class GameRepository(
         gameDataSource.updateBoardAndPendingMoves(gameId, board, pendingMoves)
     }
 
+    suspend fun checkTurnExpirationForUser(userId: String, currentTimeMillis: Long){
+        gameDataSource.checkTurnExpirationForUser(userId, currentTimeMillis )
+    }
+
 
 }
