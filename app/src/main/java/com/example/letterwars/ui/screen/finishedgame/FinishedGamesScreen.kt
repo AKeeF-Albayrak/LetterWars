@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.letterwars.data.model.GameResult
@@ -160,22 +162,22 @@ fun FinishedGamesScreen(
 
 @Composable
 fun FinishedGamesList(
-    gameInfoList: List<Pair<GameResult, Long>>,
+    gameInfoList: List<GameInfo>,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(gameInfoList) { (result, timestamp) ->
-            FinishedGameItem(result = result, timestamp = timestamp)
+        items(gameInfoList) { gameInfo ->
+            FinishedGameItem(gameInfo = gameInfo)
         }
     }
 }
 
 @Composable
-fun FinishedGameItem(result: GameResult, timestamp: Long) {
-    val (containerColor, resultColor, resultText) = when (result) {
+fun FinishedGameItem(gameInfo: GameInfo) {
+    val (containerColor, resultColor, resultText) = when (gameInfo.result) {
         GameResult.WIN -> Triple(Color(0xFFEAF7E8), Color(0xFF4CAF50), "Kazandın")
         GameResult.LOSS -> Triple(Color(0xFFFAEAEA), Color(0xFFF44336), "Kaybettin")
         GameResult.DRAW -> Triple(Color(0xFFFFF3E0), Color(0xFFFF9800), "Berabere")
@@ -190,45 +192,131 @@ fun FinishedGameItem(result: GameResult, timestamp: Long) {
             containerColor = Color.White
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(16.dp)
         ) {
-            Column {
-                Text(
-                    text = "Oyun Tarihi",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFF757575) // Hafif gri
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = formatDate(timestamp),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E3E3E)
-                    )
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .background(resultColor, shape = RoundedCornerShape(8.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
+            // Üst kısım: Tarih ve Sonuç
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Column {
+                    Text(
+                        text = "Oyun Tarihi",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = Color(0xFF757575) // Hafif gri
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = formatDate(gameInfo.timestamp),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF3E3E3E)
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .background(resultColor, shape = RoundedCornerShape(8.dp))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = resultText,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Divider(color = Color.LightGray, thickness = 0.5.dp)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Alt kısım: Oyuncu bilgileri ve skorlar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Oyuncu (ben)
+                PlayerScoreInfo(
+                    label = "Sen",
+                    username = gameInfo.playerUsername,
+                    score = gameInfo.playerScore,
+                    color = Color(0xFF4CAF50)
+                )
+
+                // VS yazısı
                 Text(
-                    text = resultText,
-                    color = Color.White,
+                    text = "VS",
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium
+                    fontSize = 16.sp,
+                    color = Color(0xFF757575),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                // Rakip
+                PlayerScoreInfo(
+                    label = "Rakip",
+                    username = gameInfo.opponentUsername,
+                    score = gameInfo.opponentScore,
+                    color = Color(0xFFF44336)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun PlayerScoreInfo(
+    label: String,
+    username: String,
+    score: Int,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = Color(0xFF757575)
+            )
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = username,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF3E3E3E)
+            ),
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(color.copy(alpha = 0.2f))
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = score.toString(),
+                fontWeight = FontWeight.Bold,
+                color = color,
+                fontSize = 18.sp
+            )
         }
     }
 }

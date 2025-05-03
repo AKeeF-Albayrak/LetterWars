@@ -180,7 +180,45 @@ class GameViewModel(
 
             println("⏳ checkWords çağrılıyor")
             // 2. Tüm kelimeleri bul ve doğrula
-            val wordList = checkWords(context, updatedBoard, placedLetters) ?: return@launch
+            val wordList = checkWords(context, updatedBoard, placedLetters)
+
+            // Eğer kelime geçersizse, harfleri geri ver ve işlemi sonlandır
+            if (wordList == null) {
+                // Harfleri kullanıcının rack'ine geri ekle
+                val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
+                    currentGame.currentLetters1.toMutableList()
+                } else {
+                    currentGame.currentLetters2.toMutableList()
+                }
+
+                // Kullanılan harfleri geri ekle
+                placedLetters.values.forEach { letter ->
+                    updatedCurrentLetters.add(letter.letter)
+                }
+
+                // Tahtadan geçici harfleri kaldır
+                val revertedBoard = currentGame.board.toMutableMap()
+                placedLetters.keys.forEach { pos ->
+                    val key = "${pos.row}-${pos.col}"
+                    val originalTile = currentGame.board[key]
+                    revertedBoard[key] = originalTile ?: GameTile()
+                }
+
+                // Oyun durumunu güncelle
+                val updatedGame = currentGame.copy(
+                    board = revertedBoard,
+                    pendingMoves = emptyMap(),
+                    currentLetters1 = if (currentGame.currentTurnPlayerId == currentGame.player1Id) updatedCurrentLetters else currentGame.currentLetters1,
+                    currentLetters2 = if (currentGame.currentTurnPlayerId == currentGame.player2Id) updatedCurrentLetters else currentGame.currentLetters2
+                )
+
+                repository.updateGame(updatedGame)
+                _game.value = updatedGame
+
+                // İşlemi sonlandır
+                return@launch
+            }
+
             println("bitmedi")
             wordList.forEach { word ->
                 println("📝 Kelime: ${word.word}, Pozisyonlar: ${word.positions}")

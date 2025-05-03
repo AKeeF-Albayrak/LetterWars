@@ -14,10 +14,20 @@ import kotlinx.coroutines.tasks.await
 
 sealed class FinishedGamesUiState {
     object Loading : FinishedGamesUiState()
-    data class Success(val gameInfoList: List<Pair<GameResult, Long>>) : FinishedGamesUiState()
+    data class Success(val gameInfoList: List<GameInfo>) : FinishedGamesUiState()
     data class Error(val message: String) : FinishedGamesUiState()
     object Empty : FinishedGamesUiState()
 }
+
+// Oyun bilgilerini daha detaylı tutacak veri sınıfı
+data class GameInfo(
+    val result: GameResult,
+    val timestamp: Long,
+    val playerUsername: String,
+    val opponentUsername: String,
+    val playerScore: Int,
+    val opponentScore: Int
+)
 
 class FinishedGamesViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -48,24 +58,59 @@ class FinishedGamesViewModel : ViewModel() {
                 .whereEqualTo("status", "FINISHED")
                 .get().await()
 
-            val gameInfoList = (p1.documents + p2.documents).map { doc ->
-                val winnerId  = doc.getString("winnerId")
+            val gameInfoListFuture = (p1.documents + p2.documents).map { doc ->
+                val winnerId = doc.getString("winnerId")
                 val timestamp = doc.getLong("createdAt") ?: System.currentTimeMillis()
 
+                val player1Id = doc.getString("player1Id") ?: ""
+                val player2Id = doc.getString("player2Id") ?: ""
+                val player1Score = doc.getLong("player1Score")?.toInt() ?: 0
+                val player2Score = doc.getLong("player2Score")?.toInt() ?: 0
+
+                val isPlayer1 = currentUserId == player1Id
+
+                val playerId = if (isPlayer1) player1Id else player2Id
+                val opponentId = if (isPlayer1) player2Id else player1Id
+
+                val playerScore = if (isPlayer1) player1Score else player2Score
+                val opponentScore = if (isPlayer1) player2Score else player1Score
+
                 val result = when {
-                    winnerId == currentUserId           -> GameResult.WIN
-                    winnerId.isNullOrBlank()            -> GameResult.DRAW   // boş bırakıldıysa berabere
-                    winnerId.equals("DRAW", true)       -> GameResult.DRAW   // “DRAW” sabiti kullanıldıysa
-                    else                                -> GameResult.LOSS
+                    winnerId == currentUserId -> GameResult.WIN
+                    winnerId.isNullOrBlank() -> GameResult.DRAW   // boş bırakıldıysa berabere
+                    winnerId.equals("DRAW", true) -> GameResult.DRAW   // "DRAW" sabiti kullanıldıysa
+                    else -> GameResult.LOSS
                 }
-                result to timestamp
+
+                // Kullanıcı bilgilerini almak için Firestore sorguları
+                val playerUserFuture = db.collection("users").document(playerId).get().await()
+                val opponentUserFuture = db.collection("users").document(opponentId).get().await()
+
+                // Kullanıcı adlarını al (varsayılan değerler kullanarak)
+                val playerUsername = playerUserFuture.getString("username")
+                    ?: playerUserFuture.getString("email")
+                    ?: "Oyuncu"
+
+                val opponentUsername = opponentUserFuture.getString("username")
+                    ?: opponentUserFuture.getString("email")
+                    ?: "Rakip"
+
+                // Oyun bilgilerini GameInfo nesnesine dönüştür
+                GameInfo(
+                    result = result,
+                    timestamp = timestamp,
+                    playerUsername = playerUsername,
+                    opponentUsername = opponentUsername,
+                    playerScore = playerScore,
+                    opponentScore = opponentScore
+                )
             }
 
-            if (gameInfoList.isEmpty()) {
+            if (gameInfoListFuture.isEmpty()) {
                 _uiState.value = FinishedGamesUiState.Empty
             } else {
                 _uiState.value = FinishedGamesUiState.Success(
-                    gameInfoList.sortedByDescending { it.second }   // en yeni üstte
+                    gameInfoListFuture.sortedByDescending { it.timestamp }   // en yeni üstte
                 )
             }
 
