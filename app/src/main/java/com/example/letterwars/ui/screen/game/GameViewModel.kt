@@ -157,170 +157,159 @@ class GameViewModel(
         }
     }
 
-    fun confirmMove(placedLetters: Map<Position, RackLetter>) {
-        viewModelScope.launch {
-            val currentGame = _game.value ?: return@launch
-            val context = getApplication<Application>().applicationContext
+    fun confirmMove(
+        placedLetters: Map<Position, RackLetter>
+    ) = viewModelScope.launch {
+        val currentGame = _game.value ?: return@launch
+        val context = getApplication<Application>().applicationContext
 
-            // Tetiklenen efektleri topla
-            val triggeredEffectsList = mutableListOf<TriggeredEffect>()
-            println("sa")
+        /* ───────────────────────── 1. Tahtayı güncelle ───────────────────────── */
 
-            // 1. Tahtayı güncelle
-            val updatedBoard = currentGame.board.toMutableMap()
-            placedLetters.forEach { (pos, rackLetter) ->
-                val key = "${pos.row}-${pos.col}"
-                val currentTile = updatedBoard[key]
+        val triggeredEffectsList = mutableListOf<TriggeredEffect>()
+        val updatedBoard = currentGame.board.toMutableMap()
 
-                // Eğer bu hücrede bir mine veya reward varsa, efektler listesine ekle
-                if (currentTile?.mineType != null || currentTile?.rewardType != null) {
-                    triggeredEffectsList.add(
-                        TriggeredEffect(
-                            position = pos,
-                            mineType = currentTile.mineType,
-                            rewardType = currentTile.rewardType
-                        )
-                    )
-                }
+        placedLetters.forEach { (pos, rackLetter) ->
+            val key = "${pos.row}-${pos.col}"
+            val currentTile = updatedBoard[key]
 
-                updatedBoard[key] = GameTile(letter = rackLetter.letter)
-            }
-
-            // Tetiklenen efektleri güncelle
-            _triggeredEffects.value = triggeredEffectsList
-
-            println("⏳ checkWords çağrılıyor")
-            // 2. Tüm kelimeleri bul ve doğrula
-            val wordList = checkWords(context, updatedBoard, placedLetters)
-
-            // Eğer kelime geçersizse, harfleri geri ver ve işlemi sonlandır
-            if (wordList == null) {
-                // 1. Harfleri oyuncunun rack’ine geri koy
-                val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
-                    currentGame.currentLetters1.toMutableList()
-                } else {
-                    currentGame.currentLetters2.toMutableList()
-                }
-                placedLetters.values.forEach { letter -> updatedCurrentLetters += letter.letter }
-
-                // 2. Tahtadan harfleri temizle
-                val revertedBoard = currentGame.board.toMutableMap()
-                placedLetters.keys.forEach { pos ->
-                    val key = "${pos.row}-${pos.col}"
-                    val originalTile = currentGame.board[key]
-                    revertedBoard[key] = (originalTile ?: GameTile()).copy(letter = null)
-                }
-
-                val updatedGame = currentGame.copy(
-                    board = revertedBoard,
-                    pendingMoves = emptyMap(),
-                    currentLetters1 = if (currentGame.currentTurnPlayerId == currentGame.player1Id)
-                        updatedCurrentLetters else currentGame.currentLetters1,
-                    currentLetters2 = if (currentGame.currentTurnPlayerId == currentGame.player2Id)
-                        updatedCurrentLetters else currentGame.currentLetters2
+            // Mayın / ödül tetikleniyorsa kaydet
+            if (currentTile?.mineType != null || currentTile?.rewardType != null) {
+                triggeredEffectsList += TriggeredEffect(
+                    position   = pos,
+                    mineType   = currentTile.mineType,
+                    rewardType = currentTile.rewardType
                 )
-
-                repository.updateGame(updatedGame)
-                _game.value = updatedGame
-                return@launch
             }
 
-            println("bitmedi")
-            wordList.forEach { word ->
-                println("📝 Kelime: ${word.word}, Pozisyonlar: ${word.positions}")
-            }
+            updatedBoard[key] = GameTile(letter = rackLetter.letter)
+        }
 
-            // 3. Puanı hesapla
-            val score = calculateScore(updatedBoard, placedLetters, wordList)
+        _triggeredEffects.value = triggeredEffectsList
 
-            val updatedPlayer1Score: Int
-            val updatedPlayer2Score: Int
+        /* ───────────────────────── 2. Kelimeleri doğrula ─────────────────────── */
 
-            if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
-                updatedPlayer1Score = currentGame.player1Score + score
-                updatedPlayer2Score = currentGame.player2Score
-            } else {
-                updatedPlayer1Score = currentGame.player1Score
-                updatedPlayer2Score = currentGame.player2Score + score
-            }
+        val wordList = checkWords(context, updatedBoard, placedLetters)
 
+        if (wordList == null) {
+            /* ❗ Hatalı kelime durumunda kullanıcının harflerini **EKLEMEYİN**.
+               Harfler zaten oyuncunun elindeydi, ekstra kopya yaratmayın. */
 
-            // 4. Kullanılan harfleri çıkar
-            val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
-                currentGame.currentLetters1.toMutableList()
-            } else {
-                currentGame.currentLetters2.toMutableList()
-            }
-
-            // 5. Yeni harf çek
-            val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
-            val lettersNeeded = 7 - updatedCurrentLetters.size
-            val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
-            updatedCurrentLetters.addAll(newLetters)
-
-            // 6. Sıradaki oyuncuyu belirle
-            val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
-                currentGame.player2Id
-            } else {
-                currentGame.player1Id
-            }
-
-            // 7. Zamanlar
-            val currentTime = System.currentTimeMillis()
-            val expireTime = currentTime + (currentGame.duration.minutes * 60 * 1000)
-
-            // 8. Hamleyi oluştur
-            val mainWord = wordList.first() // ilk kelime: ana kelime
-            val newMove = Move(
-                playerId = currentGame.currentTurnPlayerId,
-                word = mainWord.word,
-                positions = mainWord.positions,
-                scoreEarned = score,
-                timeMillis = currentTime
-            )
-
-            // 9. Güncelle
-            val updatedMoveHistory = currentGame.moveHistory.toMutableList().apply {
-                add(newMove)
+            val revertedBoard = currentGame.board.toMutableMap()
+            placedLetters.keys.forEach { pos ->
+                val key = "${pos.row}-${pos.col}"
+                val originalTile = currentGame.board[key]
+                revertedBoard[key] = (originalTile ?: GameTile()).copy(letter = null)
             }
 
             val updatedGame = currentGame.copy(
-                board = updatedBoard,
-                currentLetters1 = if (currentGame.currentTurnPlayerId == currentGame.player1Id) updatedCurrentLetters else currentGame.currentLetters1,
-                currentLetters2 = if (currentGame.currentTurnPlayerId == currentGame.player2Id) updatedCurrentLetters else currentGame.currentLetters2,
-                remainingLetters = updatedRemainingLetters,
-                currentTurnPlayerId = nextTurnPlayerId,
-                moveHistory = updatedMoveHistory,
-                player1Score = updatedPlayer1Score,
-                player2Score = updatedPlayer2Score,
-                pendingMoves = emptyMap(),
-                startTimeMillis = currentTime,
-                expireTimeMillis = expireTime
+                board          = revertedBoard,
+                pendingMoves   = emptyMap(),
+                // Harf listeleri değişmedi
             )
-
 
             repository.updateGame(updatedGame)
             _game.value = updatedGame
-
-            val bothPlayersOutOfLetters =
-                updatedGame.currentLetters1.isEmpty() && updatedGame.currentLetters2.isEmpty()
-
-            val player1OutOfLetters = updatedGame.currentLetters1.isEmpty()
-            val player2OutOfLetters = updatedGame.currentLetters2.isEmpty()
-
-            val lastMove = updatedGame.moveHistory.lastOrNull()
-            val isLastMoveEmptyWord = lastMove?.word.isNullOrEmpty()
-
-            val shouldConclude = bothPlayersOutOfLetters ||
-                    (player1OutOfLetters && updatedGame.currentTurnPlayerId == updatedGame.player2Id && isLastMoveEmptyWord) ||
-                    (player2OutOfLetters && updatedGame.currentTurnPlayerId == updatedGame.player1Id && isLastMoveEmptyWord)
-
-            if (shouldConclude) {
-                concludeGame(updatedGame)
-                return@launch
-            }
+            return@launch
         }
+
+        /* ───────────────────────── 3. Puanı hesapla ─────────────────────────── */
+
+        val score = calculateScore(updatedBoard, placedLetters, wordList)
+
+        val updatedPlayer1Score: Int
+        val updatedPlayer2Score: Int
+        if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
+            updatedPlayer1Score = currentGame.player1Score + score
+            updatedPlayer2Score = currentGame.player2Score
+        } else {
+            updatedPlayer1Score = currentGame.player1Score
+            updatedPlayer2Score = currentGame.player2Score + score
+        }
+
+        /* ───────────────────────── 4. Kullanılan harfleri çıkar ──────────────── */
+
+        val updatedCurrentLetters =
+            if (currentGame.currentTurnPlayerId == currentGame.player1Id)
+                currentGame.currentLetters1.toMutableList()
+            else
+                currentGame.currentLetters2.toMutableList()
+
+        placedLetters.values.forEach { rackLetter ->
+            updatedCurrentLetters.remove(rackLetter.letter)
+        }
+
+        /* ───────────────────────── 5. Yeni harf çek ─────────────────────────── */
+
+        val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
+        val lettersNeeded = maxOf(0, 7 - updatedCurrentLetters.size) // güvenlik
+        val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
+        updatedCurrentLetters += newLetters
+
+        /* ───────────────────────── 6. Sıradaki oyuncu ───────────────────────── */
+
+        val nextTurnPlayerId =
+            if (currentGame.currentTurnPlayerId == currentGame.player1Id)
+                currentGame.player2Id
+            else
+                currentGame.player1Id
+
+        /* ───────────────────────── 7. Zamanlar ──────────────────────────────── */
+
+        val currentTime = System.currentTimeMillis()
+        val expireTime  = currentTime + (currentGame.duration.minutes * 60 * 1000)
+
+        /* ───────────────────────── 8. Hamleyi oluştur ───────────────────────── */
+
+        val mainWord = wordList.first()
+        val newMove = Move(
+            playerId    = currentGame.currentTurnPlayerId,
+            word        = mainWord.word,
+            positions   = mainWord.positions,
+            scoreEarned = score,
+            timeMillis  = currentTime
+        )
+
+        /* ───────────────────────── 9. Oyunu güncelle ────────────────────────── */
+
+        val updatedMoveHistory = currentGame.moveHistory.toMutableList().apply { add(newMove) }
+
+        val updatedGame = currentGame.copy(
+            board             = updatedBoard,
+            currentLetters1   = if (currentGame.currentTurnPlayerId == currentGame.player1Id)
+                updatedCurrentLetters else currentGame.currentLetters1,
+            currentLetters2   = if (currentGame.currentTurnPlayerId == currentGame.player2Id)
+                updatedCurrentLetters else currentGame.currentLetters2,
+            remainingLetters  = updatedRemainingLetters,
+            currentTurnPlayerId = nextTurnPlayerId,
+            moveHistory       = updatedMoveHistory,
+            player1Score      = updatedPlayer1Score,
+            player2Score      = updatedPlayer2Score,
+            pendingMoves      = emptyMap(),
+            startTimeMillis   = currentTime,
+            expireTimeMillis  = expireTime
+        )
+
+        repository.updateGame(updatedGame)
+        _game.value = updatedGame
+
+        /* ───────────────────────── 10. Oyun bitti mi? ───────────────────────── */
+
+        val bothPlayersOut = updatedGame.currentLetters1.isEmpty() &&
+                updatedGame.currentLetters2.isEmpty()
+
+        val player1Out = updatedGame.currentLetters1.isEmpty()
+        val player2Out = updatedGame.currentLetters2.isEmpty()
+        val lastMove   = updatedGame.moveHistory.lastOrNull()
+        val lastEmpty  = lastMove?.word.isNullOrEmpty()
+
+        val shouldConclude =
+            bothPlayersOut ||
+                    (player1Out && updatedGame.currentTurnPlayerId == updatedGame.player2Id && lastEmpty) ||
+                    (player2Out && updatedGame.currentTurnPlayerId == updatedGame.player1Id && lastEmpty)
+
+        if (shouldConclude) concludeGame(updatedGame)
     }
+
 
     fun clearTriggeredEffects() {
         _triggeredEffects.value = emptyList()
