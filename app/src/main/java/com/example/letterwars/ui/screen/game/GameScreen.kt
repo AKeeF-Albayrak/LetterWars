@@ -71,8 +71,6 @@
         var dragOffset by remember { mutableStateOf(Offset.Zero) }
         var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
 
-
-
         val currentDragTargetCell = remember { mutableStateOf<Position?>(null) }
 
         // Özel efektler için state'ler
@@ -148,9 +146,7 @@
             }
         }
 
-
         val rackLetters = remember { mutableStateListOf<RackLetter>() }
-
 
         LaunchedEffect(currentLetters) {
             rackLetters.clear()
@@ -159,7 +155,6 @@
                 rackLetters.add(RackLetter(letter, point))
             }
         }
-
 
         val placedLetters = remember { mutableStateMapOf<Position, RackLetter>() }
         val cellPositions = remember { mutableStateMapOf<Position, Pair<Offset, Size>>() }
@@ -208,10 +203,11 @@
                 ?.letterIndices ?: emptyList()
         }
 
+        // Main container with pure purple background
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF2C003E))
+                .background(Color(0xFF2C003E)) // Sadece mor arkaplan
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -353,7 +349,7 @@
                                     placedLetters.clear()
                                 },
                                 onUndo = {
-                                    viewModel.clearPendingMoves(placedLetters) // <-- parametreyi gönder
+                                    viewModel.clearPendingMoves(placedLetters)
                                     placedLetters.clear()
                                     viewModel.updateValidPositions()
                                 }
@@ -493,6 +489,8 @@
                     )
                 }
             }
+
+            // Game over screen - uses the same purple background
             if (showGameOver.value || gameState?.status == GameStatus.FINISHED) {
                 GameOverCard(
                     game = gameState!!,
@@ -502,7 +500,6 @@
             }
         }
     }
-
     @Composable
     fun GameOverCard(game: Game, currentUserId: String, navController: NavController) {
         val message = when {
@@ -511,10 +508,11 @@
             else -> "Üzgünüm, Kaybettin. 😢"
         }
 
+        // Modified to use the same purple background as the main screen
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+                .background(Color(0xFF2C003E).copy(alpha = 0.9f)),
             contentAlignment = Alignment.Center
         ) {
             Card(
@@ -1274,7 +1272,7 @@
                     .height(70.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF450149)
+                    containerColor = Color(0xFF5E35B1) // Daha canlı mor renk
                 )
             ) {
                 Row(
@@ -1375,9 +1373,13 @@
             }
         )
 
-        val backgroundColor = if (isSelected) Color(0xFFFFF176) else Color(0xFFFFF59D)
-        val borderColor = if (isSelected) Color.Green else Color.Black
+        // Daha canlı, belirgin renkler
+        val backgroundColor = if (isSelected) Color(0xFFFFD700) else Color(0xFFFFC107) // Daha canlı altın/sarı renk
+        val borderColor = if (isSelected) Color(0xFF4CAF50) else Color(0xFF673AB7) // Yeşil seçim, mor kenar
         val borderWidth = if (isSelected) 2.dp else 1.dp
+
+        // Metin rengi koyu renk olacak
+        val textColor = Color(0xFF212121) // Koyu metin rengi
 
         var position by remember { mutableStateOf(Offset.Zero) }
 
@@ -1420,6 +1422,7 @@
                 text = letter.uppercase(),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
+                color = textColor,
                 modifier = Modifier.align(Alignment.Center)
             )
 
@@ -1427,6 +1430,7 @@
                 text = points.toString(),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
+                color = textColor,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)

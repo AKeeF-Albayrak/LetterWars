@@ -93,7 +93,9 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF9575CD),
-                                unfocusedBorderColor = Color(0xFFD1C4E9)
+                                unfocusedBorderColor = Color(0xFFD1C4E9),
+                                focusedTextColor = Color(0xFF212121), // Daha koyu metin rengi
+                                unfocusedTextColor = Color(0xFF212121) // Daha koyu metin rengi
                             )
                         )
 
@@ -113,7 +115,9 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF9575CD),
-                                unfocusedBorderColor = Color(0xFFD1C4E9)
+                                unfocusedBorderColor = Color(0xFFD1C4E9),
+                                focusedTextColor = Color(0xFF212121), // Daha koyu metin rengi
+                                unfocusedTextColor = Color(0xFF212121) // Daha koyu metin rengi
                             )
                         )
 
