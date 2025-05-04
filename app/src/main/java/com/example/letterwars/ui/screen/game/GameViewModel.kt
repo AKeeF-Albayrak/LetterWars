@@ -121,17 +121,18 @@ class GameViewModel(
         )
         _game.value = updatedGame
         viewModelScope.launch {
-            repository.updateBoardAndPendingMoves(updatedGame.gameId, updatedBoard, updatedMoves)
+            repository.updateGame(updatedGame)
         }
     }
 
 
-    fun clearPendingMoves() {
+
+    fun clearPendingMoves(placedLetters: Map<Position, RackLetter>) {
         val currentGame = _game.value ?: return
-
         val updatedBoard = currentGame.board.toMutableMap()
+        val updatedPendingMoves = currentGame.pendingMoves.toMutableMap()
 
-        // Sadece pending moves içindekileri temizle
+        // 1. Harfleri tahtadan sil
         for (key in currentGame.pendingMoves.keys) {
             val tile = updatedBoard[key]?.copy(letter = null)
             if (tile != null) {
@@ -139,20 +140,32 @@ class GameViewModel(
             }
         }
 
+        // 2. Harfleri kullanıcıya geri ver
+        val updatedLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id)
+            currentGame.currentLetters1.toMutableList()
+        else
+            currentGame.currentLetters2.toMutableList()
+
+        placedLetters.values.forEach {
+            updatedLetters.add(it.letter)
+        }
+
+        // 3. Güncellenmiş game nesnesini oluştur
         val updatedGame = currentGame.copy(
+            board = updatedBoard,
             pendingMoves = emptyMap(),
-            board = updatedBoard
+            currentLetters1 = if (currentGame.currentTurnPlayerId == currentGame.player1Id) updatedLetters else currentGame.currentLetters1,
+            currentLetters2 = if (currentGame.currentTurnPlayerId == currentGame.player2Id) updatedLetters else currentGame.currentLetters2,
         )
+
         _game.value = updatedGame
 
         viewModelScope.launch {
-            repository.updateBoardAndPendingMoves(
-                updatedGame.gameId,
-                updatedBoard,
-                emptyMap()
-            )
+            repository.updateGame(updatedGame)
         }
     }
+
+
 
     fun confirmMove(placedLetters: Map<Position, RackLetter>) {
         viewModelScope.launch {
@@ -390,8 +403,8 @@ class GameViewModel(
                 moveHistory         = updatedMoveHistory
             )
 
-            val isAllEmptyMoves = updatedMoveHistory.takeLast(4)
-                .all { it.word.isEmpty() }
+            val isAllEmptyMoves = updatedMoveHistory.size >= 4 &&
+                    updatedMoveHistory.takeLast(4).all { it.word.isEmpty() }
 
             if (isAllEmptyMoves) {
                 concludeGame(updatedGame)

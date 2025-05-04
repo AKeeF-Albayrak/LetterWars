@@ -148,6 +148,7 @@
 
         val rackLetters = remember { mutableStateListOf<RackLetter>() }
 
+
         LaunchedEffect(currentLetters) {
             rackLetters.clear()
             currentLetters?.forEach { letter ->
@@ -342,16 +343,8 @@
                                     placedLetters.clear()
                                 },
                                 onUndo = {
-                                    placedLetters.forEach { (_, rackLetter) ->
-                                        val emptyIndex = rackLetters.indexOfFirst { it.letter.isEmpty() }
-                                        if (emptyIndex != -1) {
-                                            rackLetters[emptyIndex] = rackLetter
-                                        } else {
-                                            rackLetters.add(rackLetter)
-                                        }
-                                    }
+                                    viewModel.clearPendingMoves(placedLetters) // <-- parametreyi gönder
                                     placedLetters.clear()
-                                    viewModel.clearPendingMoves()
                                     viewModel.updateValidPositions()
                                 }
                             )
