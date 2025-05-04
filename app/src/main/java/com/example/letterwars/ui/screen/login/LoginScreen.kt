@@ -40,12 +40,10 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFF8E1)) // Beyaza yakın sıcak arka plan
+            .background(Color(0xFFFFF8E1))
     ) {
-        // Floating letters background
         FloatingLettersBackground()
 
-        // Login form with animation
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -75,7 +73,7 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                             text = "Giriş Yap",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF6A1B9A) // Ana mor renk
+                            color = Color(0xFF6A1B9A)
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
@@ -94,8 +92,8 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF9575CD),
                                 unfocusedBorderColor = Color(0xFFD1C4E9),
-                                focusedTextColor = Color(0xFF212121), // Daha koyu metin rengi
-                                unfocusedTextColor = Color(0xFF212121) // Daha koyu metin rengi
+                                focusedTextColor = Color(0xFF212121),
+                                unfocusedTextColor = Color(0xFF212121)
                             )
                         )
 
@@ -116,8 +114,8 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = Color(0xFF9575CD),
                                 unfocusedBorderColor = Color(0xFFD1C4E9),
-                                focusedTextColor = Color(0xFF212121), // Daha koyu metin rengi
-                                unfocusedTextColor = Color(0xFF212121) // Daha koyu metin rengi
+                                focusedTextColor = Color(0xFF212121),
+                                unfocusedTextColor = Color(0xFF212121)
                             )
                         )
 
@@ -152,7 +150,7 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                                 .height(60.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.elevatedButtonColors(
-                                containerColor = Color(0xFFBA68C8), // Mor-pembe
+                                containerColor = Color(0xFFBA68C8),
                                 contentColor = Color.White
                             )
                         ) {
@@ -187,9 +185,9 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                                     .padding(horizontal = 16.dp, vertical = 8.dp)
                                     .background(
                                         color = if (status.contains("başarılı", ignoreCase = true))
-                                            Color(0xFFE8F5E9) // Açık yeşil arka plan
+                                            Color(0xFFE8F5E9)
                                         else
-                                            Color(0xFFFFEBEE), // Açık kırmızı arka plan
+                                            Color(0xFFFFEBEE),
                                         shape = RoundedCornerShape(8.dp)
                                     )
                                     .padding(12.dp)
@@ -197,9 +195,9 @@ fun LoginScreen(navController: NavController, viewModel: LoginViewModel = viewMo
                                 Text(
                                     text = status,
                                     color = if (status.contains("başarılı", ignoreCase = true))
-                                        Color(0xFF4CAF50) // Yeşil metin
+                                        Color(0xFF4CAF50)
                                     else
-                                        Color(0xFFF44336), // Kırmızı metin
+                                        Color(0xFFF44336),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth()
                                 )

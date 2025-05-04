@@ -30,13 +30,11 @@
     import androidx.compose.ui.input.pointer.pointerInput
     import androidx.compose.ui.layout.onGloballyPositioned
     import androidx.compose.ui.layout.positionInRoot
-    import androidx.compose.ui.platform.LocalDensity
     import androidx.compose.ui.text.font.FontWeight
     import androidx.compose.ui.text.style.TextAlign
     import androidx.compose.ui.unit.IntOffset
     import androidx.compose.ui.unit.dp
     import androidx.compose.ui.unit.sp
-    import androidx.lifecycle.ViewModel
     import androidx.lifecycle.viewmodel.compose.viewModel
     import androidx.navigation.NavController
     import com.example.letterwars.data.model.*
@@ -48,7 +46,6 @@
     import kotlin.math.roundToInt
     import kotlin.math.sin
 
-    // CompositionLocal to track if a letter is selected
     val LocalSelectedLetterExists = compositionLocalOf { false }
 
     @Composable
@@ -73,15 +70,13 @@
 
         val currentDragTargetCell = remember { mutableStateOf<Position?>(null) }
 
-        // Özel efektler için state'ler
+
         var showMineEffect by remember { mutableStateOf<MineType?>(null) }
         var showRewardEffect by remember { mutableStateOf<RewardType?>(null) }
         var currentEffectIndex by remember { mutableStateOf(0) }
 
-        // Tetiklenen efektleri göstermek için LaunchedEffect
         LaunchedEffect(triggeredEffects) {
             if (triggeredEffects.isNotEmpty()) {
-                // İlk efekti göster
                 currentEffectIndex = 0
                 val effect = triggeredEffects.firstOrNull()
                 if (effect != null) {
@@ -186,7 +181,6 @@
                     position.y >= cellPos.y &&
                     position.y <= cellPos.y + cellSize.height) {
 
-                    // Check if cell is empty
                     if (!placedLetters.containsKey(cellCoord)) {
                         foundCell = cellCoord
                     }
@@ -203,11 +197,10 @@
                 ?.letterIndices ?: emptyList()
         }
 
-        // Main container with pure purple background
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF2C003E)) // Sadece mor arkaplan
+                .background(Color(0xFF2C003E))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -233,7 +226,6 @@
 
                         val playerScore = if (isPlayer1) gameState?.player1Score ?: 0 else gameState?.player2Score ?: 0
                         val opponentScore = if (isPlayer1) gameState?.player2Score ?: 0 else gameState?.player1Score ?: 0
-                        // Player cards at the top
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -241,7 +233,6 @@
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Player card
                             PlayerScoreCard(
                                 name = viewModel.currentUsername.collectAsState().value,
                                 score = playerScore,
@@ -303,7 +294,6 @@
                             }
                         }
 
-                        // Game board
                         CompositionLocalProvider(
                             LocalSelectedLetterExists provides (selectedLetter.value != null)
                         ) {
@@ -433,7 +423,6 @@
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    // Dragged letter overlay
                     draggedLetter?.let { letter ->
                         Box(
                             modifier = Modifier
@@ -466,23 +455,19 @@
                         }
                     }
 
-                    // Özel efekt popup'ı
                     SpecialEffectPopupManager(
                         showMineEffect = showMineEffect,
                         showRewardEffect = showRewardEffect,
                         onDismiss = {
-                            // Mevcut efekti temizle
                             showMineEffect = null
                             showRewardEffect = null
 
-                            // Bir sonraki efekte geç
                             currentEffectIndex++
                             if (currentEffectIndex < triggeredEffects.size) {
                                 val nextEffect = triggeredEffects[currentEffectIndex]
                                 showMineEffect = nextEffect.mineType
                                 showRewardEffect = nextEffect.rewardType
                             } else {
-                                // Tüm efektler gösterildiyse, listeyi temizle
                                 viewModel.clearTriggeredEffects()
                             }
                         }
@@ -490,7 +475,6 @@
                 }
             }
 
-            // Game over screen - uses the same purple background
             if (showGameOver.value || gameState?.status == GameStatus.FINISHED) {
                 GameOverCard(
                     game = gameState!!,
@@ -508,7 +492,6 @@
             else -> "Üzgünüm, Kaybettin. 😢"
         }
 
-        // Modified to use the same purple background as the main screen
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -577,7 +560,6 @@
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Teslim ol butonu
                 ActionButton(
                     text = "Teslim Ol",
                     icon = Icons.Default.Close,
@@ -587,7 +569,6 @@
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Pas butonu
                 ActionButton(
                     text = "Pas",
                     icon = Icons.Default.Done,
@@ -597,7 +578,6 @@
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Onayla butonu
                 ActionButton(
                     text = "Onayla",
                     icon = Icons.Default.Done,
@@ -607,7 +587,6 @@
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                // Geri Al butonu
                 ActionButton(
                     text = "Geri Al",
                     icon = Icons.Default.Close,
@@ -730,14 +709,12 @@
             modifier = Modifier.size(80.dp)
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                // Çevre çemberi
                 drawCircle(
                     color = Color.LightGray,
                     radius = size.minDimension / 2,
                     style = Stroke(width = 4f)
                 )
 
-                // Saat tik işaretleri
                 for (i in 0 until 12) {
                     val angle = (i * 30) * (PI / 180f)
                     val startRadius = size.minDimension / 2 - 10f
@@ -756,7 +733,6 @@
                     )
                 }
 
-                // Progress'e göre dakika ibresi
                 val minuteAngle = (1f - progress) * 360f * (PI / 180f)
                 val handLength = size.minDimension / 2 - 15f
 
@@ -771,7 +747,6 @@
                     cap = StrokeCap.Round
                 )
 
-                // Orta siyah nokta
                 drawCircle(
                     color = Color.Black,
                     radius = 4f,
@@ -791,33 +766,32 @@
         }
     }
 
-    // Mine ve Reward ikonları için bileşenler
     @Composable
     fun MineTypeIcon(type: MineType, modifier: Modifier = Modifier) {
         val (icon, color, contentDescription) = when (type) {
             MineType.POINT_DIVISION -> Triple(
                 Icons.Filled.KeyboardArrowDown,
-                Color(0xFFE57373), // Kırmızı
+                Color(0xFFE57373),
                 "Puan Bölünmesi"
             )
             MineType.POINT_TRANSFER -> Triple(
                 Icons.Filled.Person,
-                Color(0xFFFFB74D), // Turuncu
+                Color(0xFFFFB74D),
                 "Puan Transferi"
             )
             MineType.LETTER_RESET -> Triple(
                 Icons.Filled.Refresh,
-                Color(0xFFFFF176), // Sarı
+                Color(0xFFFFF176),
                 "Harf Sıfırlama"
             )
             MineType.BONUS_CANCEL -> Triple(
                 Icons.Filled.Clear,
-                Color(0xFFBA68C8), // Mor
+                Color(0xFFBA68C8),
                 "Bonus İptali"
             )
             MineType.WORD_CANCEL -> Triple(
                 Icons.Filled.Close,
-                Color(0xFFEF5350), // Koyu Kırmızı
+                Color(0xFFEF5350),
                 "Kelime İptali"
             )
         }
@@ -836,17 +810,17 @@
         val (icon, color, contentDescription) = when (type) {
             RewardType.AREA_BLOCK -> Triple(
                 Icons.Filled.Star,
-                Color(0xFF4FC3F7), // Blue
+                Color(0xFF4FC3F7),
                 "Alan Bloklama"
             )
             RewardType.LETTER_FREEZE -> Triple(
                 Icons.Filled.Face,
-                Color(0xFF81C784), // Green
+                Color(0xFF81C784),
                 "Harf Dondurma"
             )
             RewardType.EXTRA_TURN -> Triple(
                 Icons.Filled.Refresh,
-                Color(0xFFFFD54F), // Gold
+                Color(0xFFFFD54F),
                 "Ekstra Tur"
             )
         }
@@ -1147,10 +1121,8 @@
             CellType.CENTER        -> Color(0xFFF9E79F)
         }
 
-        // Tahta hücresinde harf var mı?
         val hasLetter = placedLetter != null || !tile.letter.isNullOrEmpty()
 
-        // Hücreyi çizen kutu
         Box(
             modifier = modifier
                 .padding(1.dp)
@@ -1159,7 +1131,6 @@
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            // 1) Mine / reward ikonları (harf yoksa)
             if (!hasLetter && (tile.mineType != null || tile.rewardType != null)) {
                 Box(
                     Modifier
@@ -1176,7 +1147,6 @@
                 }
             }
 
-            // 2) Harf varsa: her zaman koyu renk metin, tam ortalanmış
             if (hasLetter) {
                 Box(
                     Modifier.fillMaxSize(),
@@ -1187,22 +1157,20 @@
                         text = letterChar.uppercase(),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121),   // koyu metin rengi
+                        color = Color(0xFF212121),
                         textAlign = TextAlign.Center
                     )
                 }
             } else {
-                // 3) Hiç harf yoksa, bonus kısaltmaları
                 when (tile.cellType) {
                     CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                     CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                     CellType.DOUBLE_WORD   -> Text("2W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                     CellType.TRIPLE_WORD   -> Text("3W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-                    else                   -> { /* NORMAL veya CENTER zaten arkaplan rengiyle gösteriliyor */ }
+                    else                   -> {}
                 }
             }
 
-            // 4) Geçerli hamle noktası için pulse animasyonu
             val isLetterSelected = LocalSelectedLetterExists.current ||
                     currentDragTargetCell == Position(row, col)
             val isCenterCell = row == 7 && col == 7
@@ -1260,7 +1228,7 @@
                     .height(70.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF5E35B1) // Daha canlı mor renk
+                    containerColor = Color(0xFF5E35B1)
                 )
             ) {
                 Row(
@@ -1368,13 +1336,12 @@
             }
         )
 
-        // Daha canlı, belirgin renkler
-        val backgroundColor = if (isSelected) Color(0xFFFFD700) else Color(0xFFFFC107) // Daha canlı altın/sarı renk
-        val borderColor = if (isSelected) Color(0xFF4CAF50) else Color(0xFF673AB7) // Yeşil seçim, mor kenar
+        val backgroundColor = if (isSelected) Color(0xFFFFD700) else Color(0xFFFFC107)
+        val borderColor = if (isSelected) Color(0xFF4CAF50) else Color(0xFF673AB7)
         val borderWidth = if (isSelected) 2.dp else 1.dp
 
-        // Metin rengi koyu renk olacak
-        val textColor = Color(0xFF212121) // Koyu metin rengi
+
+        val textColor = Color(0xFF212121)
 
         var position by remember { mutableStateOf(Offset.Zero) }
 

@@ -29,7 +29,6 @@ class UserProfileViewModel(
         }
     }
 
-    /** Firebase oturumunu kapatır */
     fun signOut() {
         auth.signOut()
     }

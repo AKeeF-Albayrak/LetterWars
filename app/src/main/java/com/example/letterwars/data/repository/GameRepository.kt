@@ -3,9 +3,7 @@ package com.example.letterwars.data.repository
 import android.util.Log
 import com.example.letterwars.data.firebase.FireBaseGameDataSource
 import com.example.letterwars.data.model.*
-import kotlinx.coroutines.tasks.await
 
-// EffectNotification veri sınıfını GameViewModel'dan bağımsız olarak tanımlama
 data class EffectNotification(
     val id: String = "",
     val playerId: String = "",
@@ -49,9 +47,6 @@ class GameRepository(
         return gameDataSource.getGamesByUser(userId)
     }
 
-    // Yeni eklenen fonksiyonlar
-
-    // Bir oyuna bölge bloklaması ekler
     suspend fun activateAreaBlock(gameId: String, userId: String, side: String, duration: Long = 2 * 60 * 1000) {
         val game = gameDataSource.getGame(gameId) ?: return
         val updatedGame = game.copy(
@@ -62,7 +57,6 @@ class GameRepository(
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Bölge bloklamasını kaldırır
     suspend fun clearAreaBlock(gameId: String) {
         val game = gameDataSource.getGame(gameId) ?: return
         val updatedGame = game.copy(
@@ -88,7 +82,6 @@ class GameRepository(
     }
 
 
-    // Ekstra tur atar
     suspend fun setExtraTurn(gameId: String, playerId: String) {
         val game = gameDataSource.getGame(gameId) ?: return
         val updatedGame = game.copy(
@@ -97,7 +90,6 @@ class GameRepository(
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Ekstra turu temizler
     suspend fun clearExtraTurn(gameId: String) {
         val game = gameDataSource.getGame(gameId) ?: return
         val updatedGame = game.copy(
@@ -106,12 +98,10 @@ class GameRepository(
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Mayın ve ödülleri içeren bir tahta oluşturur
     suspend fun generateBoardWithEffects(gameId: String) {
         val game = gameDataSource.getGame(gameId) ?: return
         val board = game.board.toMutableMap()
 
-        // Mayın ve ödülleri üret ve yerleştir
         addMinesToBoard(board)
         addRewardsToBoard(board)
 
@@ -122,9 +112,7 @@ class GameRepository(
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Mayınları tahtaya ekler
     private fun addMinesToBoard(board: MutableMap<String, GameTile>) {
-        // Her mayın tipinden 3 tane ekle
         val mineTypes = listOf(
             MineType.POINT_DIVISION,
             MineType.POINT_TRANSFER,
@@ -133,14 +121,13 @@ class GameRepository(
             MineType.WORD_CANCEL
         )
 
-        val minePositions = getRandomBoardPositions(15) // Toplam 15 mayın (her tipten 3 tane)
+        val minePositions = getRandomBoardPositions(15)
 
         minePositions.forEachIndexed { index, position ->
             val row = position.first
             val col = position.second
             val key = "$row-$col"
 
-            // Özel hücrelere veya merkeze mayın koyma
             val currentTile = board[key]
             if (currentTile?.cellType == CellType.NORMAL && !(row == 7 && col == 7)) {
                 val mineType = mineTypes[index % mineTypes.size]
@@ -153,16 +140,13 @@ class GameRepository(
         }
     }
 
-    // Ödülleri tahtaya ekler
     private fun addRewardsToBoard(board: MutableMap<String, GameTile>) {
-        // Ödül sayıları: 2 AREA_BLOCK, 3 LETTER_FREEZE, 2 EXTRA_TURN
         val rewardCounts = mapOf(
             RewardType.AREA_BLOCK to 2,
             RewardType.LETTER_FREEZE to 3,
             RewardType.EXTRA_TURN to 2
         )
 
-        // Ödüller için konumlar oluştur (toplam 7 ödül)
         val usedPositions = board.filter { it.value.mineType != null }.keys
             .mapNotNull { key ->
                 val parts = key.split("-")
@@ -184,7 +168,6 @@ class GameRepository(
                     val col = position.second
                     val key = "$row-$col"
 
-                    // Özel hücrelere, mayınlara veya merkeze ödül koyma
                     val currentTile = board[key]
                     if (currentTile?.cellType == CellType.NORMAL &&
                         currentTile.mineType == null &&
@@ -202,32 +185,26 @@ class GameRepository(
         }
     }
 
-    // Tahtada rastgele konumlar üretir
     private fun getRandomBoardPositions(count: Int, exclude: List<Pair<Int, Int>> = emptyList()): List<Pair<Int, Int>> {
         val positions = mutableListOf<Pair<Int, Int>>()
         val availablePositions = mutableListOf<Pair<Int, Int>>()
 
-        // Tüm olası konumları oluştur
         for (row in 0..14) {
             for (col in 0..14) {
                 val position = Pair(row, col)
-                // Merkezi ve dışarıda bırakılmış konumları atla
                 if ((row != 7 || col != 7) && !exclude.contains(position)) {
                     availablePositions.add(position)
                 }
             }
         }
 
-        // Konumları karıştır
         availablePositions.shuffle()
 
-        // İlk 'count' kadar konumu al
         positions.addAll(availablePositions.take(count))
 
         return positions
     }
 
-    // Tüm ödül ve mayın efektlerini temizler
     suspend fun checkAndClearExpiredEffects(gameId: String) {
         val game = gameDataSource.getGame(gameId) ?: return
         val currentTime = System.currentTimeMillis()
@@ -249,25 +226,19 @@ class GameRepository(
         }
     }
 
-    // Bildirim işlemleri için Firestore'a doğrudan erişim gerekiyor - bu örnekte basitleştirildi
-    // Gerçek bir uygulamada bu fonksiyonları FireBaseGameDataSource'a taşımak daha iyi olacaktır
     suspend fun addEffectNotification(gameId: String, notification: EffectNotification) {
         Log.d("GameRepository", "Bildirim eklenecek, ancak şu anda uygulanmadı")
-        // İlgili Firebase işlemleri burada olmalı
     }
 
     suspend fun removeEffectNotification(gameId: String, notificationId: String) {
         Log.d("GameRepository", "Bildirim silinecek, ancak şu anda uygulanmadı")
-        // İlgili Firebase işlemleri burada olmalı
     }
 
     fun listenEffectNotifications(gameId: String, onNotificationsChanged: (List<EffectNotification>) -> Unit) {
         Log.d("GameRepository", "Bildirimler dinlenecek, ancak şu anda uygulanmadı")
-        // İlgili Firebase dinleme işlemleri burada olmalı
     }
 
     suspend fun cleanupOldNotifications(gameId: String) {
         Log.d("GameRepository", "Eski bildirimler temizlenecek, ancak şu anda uygulanmadı")
-        // İlgili Firebase temizleme işlemleri burada olmalı
     }
 }

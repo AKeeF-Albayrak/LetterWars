@@ -33,13 +33,10 @@ class QueueViewModel(
     private var checkingJob = false
 
     init {
-        // QueueUserCount verisini periyodik olarak güncelle
         updateQueueUserCount()
 
-        // Oyuncu sıraya katılıyor
         joinQueue()
 
-        // Aynı zamanda aktif oyun var mı diye dinlemeye başla
         listenForGameMatch()
     }
 
@@ -49,9 +46,8 @@ class QueueViewModel(
                 val count = repo.getQueueUserCount(gameDuration)
                 _queueUserCount.value = count
             } catch (e: Exception) {
-                // Hata durumunda geçerli değeri koru
             }
-            delay(5000L) // 5 saniyede bir güncelle
+            delay(5000L)
         }
     }
 
@@ -65,22 +61,17 @@ class QueueViewModel(
     }
 
     private fun joinQueue() = viewModelScope.launch {
-        // Önce bekleyen oyun var mı kontrol et
         val waitingGame = repo.findWaitingGame(gameDuration)
 
         if (waitingGame != null && waitingGame.player1Id != playerId) {
-            // Eğer bekleyen bir oyun varsa ve bu oyuncu kendi oluşturduğu değilse, katıl
+
             val joined = repo.joinExistingGame(waitingGame, playerId)
             if (joined) {
-                // Katılım başarılı, artık oyun listeneri bize bildirimi yapacak
-                // (GameID akışı hemen güncellenmez, Firebase listener üzerinden gelir)
-                // Bu da her iki oyuncuya da bildirim gitmesini sağlar
             } else {
-                // Eğer katılım başarısız olduysa, yeni bir bekleyen oyun oluştur
+
                 createOwnWaitingGame()
             }
         } else {
-            // Bekleyen oyun yoksa, yeni bir bekleyen oyun oluştur
             createOwnWaitingGame()
         }
     }
@@ -99,22 +90,16 @@ class QueueViewModel(
 
         viewModelScope.launch {
             while (_isSearching.value) {
-                delay(5000L) // 5 saniyede bir kontrol et
+                delay(5000L)
 
-                // Hala aktif arama yapıyorsak
                 if (!_isSearching.value) break
 
-                // Bekleyen başka bir oyun var mı kontrol et
                 val waitingGame = repo.findWaitingGame(gameDuration)
                 if (waitingGame != null && waitingGame.player1Id != playerId) {
-                    // Bulunduğunda katılmayı dene
                     val success = repo.joinExistingGame(waitingGame, playerId)
                     if (success) {
-                        // Katılmayı başardıysan, kendi bekleme oyununu sil (var ise)
                         repo.deleteOwnWaitingGame(playerId)
 
-                        // GameID'yi artık güncelleme - Firebase listener üzerinden gelecek
-                        // Bu da her iki oyuncuya da bildirim gitmesini sağlar
                         break
                     }
                 }
@@ -131,12 +116,10 @@ class QueueViewModel(
     override fun onCleared() {
         super.onCleared()
 
-        // ViewModel temizlendiğinde sıradan çık ve listener'ları kapat
         viewModelScope.launch {
             try {
                 leaveQueue()
             } catch (e: Exception) {
-                // Temizlik sırasında hata oluşursa görmezden gel
             }
         }
 

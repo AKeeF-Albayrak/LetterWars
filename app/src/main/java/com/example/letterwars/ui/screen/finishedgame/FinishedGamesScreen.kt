@@ -77,7 +77,7 @@ fun FinishedGamesScreen(
                 Divider(color = Color.LightGray, thickness = 1.dp)
             }
         },
-        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan rengi
+        containerColor = Color(0xFFFFF8E1)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -197,7 +197,7 @@ fun FinishedGameItem(gameInfo: GameInfo) {
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Üst kısım: Tarih ve Sonuç
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -207,7 +207,7 @@ fun FinishedGameItem(gameInfo: GameInfo) {
                     Text(
                         text = "Oyun Tarihi",
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color(0xFF757575) // Hafif gri
+                            color = Color(0xFF757575)
                         )
                     )
 
@@ -241,12 +241,11 @@ fun FinishedGameItem(gameInfo: GameInfo) {
             Divider(color = Color.LightGray, thickness = 0.5.dp)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Alt kısım: Oyuncu bilgileri ve skorlar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Oyuncu (ben)
+
                 PlayerScoreInfo(
                     label = "Sen",
                     username = gameInfo.playerUsername,
@@ -254,7 +253,6 @@ fun FinishedGameItem(gameInfo: GameInfo) {
                     color = Color(0xFF4CAF50)
                 )
 
-                // VS yazısı
                 Text(
                     text = "VS",
                     fontWeight = FontWeight.Bold,
@@ -263,7 +261,6 @@ fun FinishedGameItem(gameInfo: GameInfo) {
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
 
-                // Rakip
                 PlayerScoreInfo(
                     label = "Rakip",
                     username = gameInfo.opponentUsername,

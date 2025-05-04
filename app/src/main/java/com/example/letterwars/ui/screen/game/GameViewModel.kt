@@ -39,14 +39,11 @@ class GameViewModel(
     private val _validPositions = MutableStateFlow<List<Position>>(emptyList())
     val validPositions: StateFlow<List<Position>> = _validPositions
 
-    // Tetiklenen özel efektleri takip etmek için StateFlow
     private val _triggeredEffects = MutableStateFlow<List<TriggeredEffect>>(emptyList())
     val triggeredEffects: StateFlow<List<TriggeredEffect>> = _triggeredEffects
 
 
 
-
-    // Tetiklenen efektleri temsil eden veri sınıfı
     data class TriggeredEffect(
         val position: Position,
         val mineType: MineType? = null,
@@ -96,17 +93,14 @@ class GameViewModel(
     fun addPendingMove(row: Int, col: Int, letter: String) {
         val currentGame = _game.value ?: return
 
-        // 1. Oyuncunun mevcut harf listesini al
         val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
             currentGame.currentLetters1.toMutableList()
         } else {
             currentGame.currentLetters2.toMutableList()
         }
 
-        // 2. Harfin ilk eşleşmesini sil
         updatedCurrentLetters.remove(letter)
 
-        // 3. pendingMoves ve board güncelle
         val updatedMoves = currentGame.pendingMoves.toMutableMap()
         updatedMoves["$row-$col"] = letter
 
@@ -115,7 +109,6 @@ class GameViewModel(
         val tile = updatedBoard[key]?.copy(letter = letter) ?: GameTile(letter = letter)
         updatedBoard[key] = tile
 
-        // 4. Oyunu kaydet
         val updatedGame = currentGame.copy(
             pendingMoves = updatedMoves,
             board = updatedBoard,
@@ -137,7 +130,6 @@ class GameViewModel(
         val updatedBoard = currentGame.board.toMutableMap()
         val updatedPendingMoves = currentGame.pendingMoves.toMutableMap()
 
-        // 1. Harfleri tahtadan sil
         for (key in currentGame.pendingMoves.keys) {
             val tile = updatedBoard[key]?.copy(letter = null)
             if (tile != null) {
@@ -145,7 +137,6 @@ class GameViewModel(
             }
         }
 
-        // 2. Harfleri kullanıcıya geri ver
         val updatedLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id)
             currentGame.currentLetters1.toMutableList()
         else
@@ -155,7 +146,6 @@ class GameViewModel(
             updatedLetters.add(it.letter)
         }
 
-        // 3. Güncellenmiş game nesnesini oluştur
         val updatedGame = currentGame.copy(
             board = updatedBoard,
             pendingMoves = emptyMap(),
@@ -177,17 +167,14 @@ class GameViewModel(
             val currentGame = _game.value ?: return@launch
             val context = getApplication<Application>().applicationContext
 
-            // Tetiklenen efektleri topla
             val triggeredEffectsList = mutableListOf<TriggeredEffect>()
             println("sa")
 
-            // 1. Tahtayı güncelle
             val updatedBoard = currentGame.board.toMutableMap()
             placedLetters.forEach { (pos, rackLetter) ->
                 val key = "${pos.row}-${pos.col}"
                 val currentTile = updatedBoard[key]
 
-                // Eğer bu hücrede bir mine veya reward varsa, efektler listesine ekle
                 if (currentTile?.mineType != null || currentTile?.rewardType != null) {
                     triggeredEffectsList.add(
                         TriggeredEffect(
@@ -202,16 +189,12 @@ class GameViewModel(
 
             }
 
-            // Tetiklenen efektleri güncelle
             _triggeredEffects.value = triggeredEffectsList
 
             println("⏳ checkWords çağrılıyor")
-            // 2. Tüm kelimeleri bul ve doğrula
             val wordList = checkWords(context, updatedBoard, placedLetters)
 
-            // Eğer kelime geçersizse, harfleri geri ver ve işlemi sonlandır
             if (wordList == null) {
-                // 1. Harfleri oyuncunun rack'ine geri koy
                 val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
                     currentGame.currentLetters1.toMutableList()
                 } else {
@@ -219,7 +202,6 @@ class GameViewModel(
                 }
                 placedLetters.values.forEach { letter -> updatedCurrentLetters += letter.letter }
 
-                // 2. Tahtadan harfleri temizle
                 val revertedBoard = currentGame.board.toMutableMap()
                 placedLetters.keys.forEach { pos ->
                     val key = "${pos.row}-${pos.col}"
@@ -246,7 +228,6 @@ class GameViewModel(
                 println("📝 Kelime: ${word.word}, Pozisyonlar: ${word.positions}")
             }
 
-            // 3. Puanı hesapla
             val score = calculateScore(updatedBoard, placedLetters, wordList)
 
             val updatedPlayer1Score: Int
@@ -273,32 +254,27 @@ class GameViewModel(
             }
 
 
-            // 4. Kullanılan harfleri çıkar
             val updatedCurrentLetters = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
                 currentGame.currentLetters1.toMutableList()
             } else {
                 currentGame.currentLetters2.toMutableList()
             }
 
-            // 5. Yeni harf çek
             val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
             val lettersNeeded = 7 - updatedCurrentLetters.size
             val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
             updatedCurrentLetters.addAll(newLetters)
 
-            // 6. Sıradaki oyuncuyu belirle
             val nextTurnPlayerId = if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
                 currentGame.player2Id
             } else {
                 currentGame.player1Id
             }
 
-            // 7. Zamanlar
             val currentTime = System.currentTimeMillis()
             val expireTime = currentTime + (currentGame.duration.minutes * 60 * 1000)
 
-            // 8. Hamleyi oluştur
-            val mainWord = wordList.first() // ilk kelime: ana kelime
+            val mainWord = wordList.first()
             val newMove = Move(
                 playerId = currentGame.currentTurnPlayerId,
                 word = mainWord.word,
@@ -307,7 +283,6 @@ class GameViewModel(
                 timeMillis = currentTime
             )
 
-            // 9. Güncelle
             val updatedMoveHistory = currentGame.moveHistory.toMutableList().apply {
                 add(newMove)
             }
@@ -359,7 +334,6 @@ class GameViewModel(
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
 
-            // 1 — Kopyalar
             val updatedBoard            = currentGame.board.toMutableMap()
             val updatedRemainingLetters = currentGame.remainingLetters.toMutableMap()
             val updatedCurrentLetters   =
@@ -368,24 +342,22 @@ class GameViewModel(
                 else
                     currentGame.currentLetters2.toMutableList()
 
-            // 2 — PENDING harfleri geri al ➜ hem board'dan sil hem rack'e ekle
             if (currentGame.pendingMoves.isNotEmpty()) {
                 currentGame.pendingMoves.forEach { (key, letter) ->
-                    // Board'daki hücreyi harfsiz hâle getir
                     updatedBoard[key] = (updatedBoard[key] ?: GameTile()).copy(letter = null)
-                    // Kullanıcının eline geri ekle
+
                     updatedCurrentLetters += letter
                 }
             }
 
-            // 3 — Gerekiyorsa harf çek
+
             val lettersNeeded = 7 - updatedCurrentLetters.size
             if (lettersNeeded > 0) {
                 val newLetters = drawLetters(updatedRemainingLetters, lettersNeeded)
                 updatedCurrentLetters.addAll(newLetters)
             }
 
-            // 4 — Sıra değişimi ve zamanlar
+
             val nextTurnPlayerId =
                 if (currentGame.currentTurnPlayerId == currentGame.player1Id)
                     currentGame.player2Id
@@ -395,12 +367,11 @@ class GameViewModel(
             val currentTime = System.currentTimeMillis()
             val expireTime  = currentTime + (currentGame.duration.minutes * 60 * 1000)
 
-            // 5 — Pas hamlesini ekle
             val updatedMoveHistory = currentGame.moveHistory.toMutableList().apply {
                 add(
                     Move(
                         playerId = currentGame.currentTurnPlayerId,
-                        word = "",                       // pas
+                        word = "",
                         positions = emptyList(),
                         scoreEarned = 0,
                         timeMillis = currentTime
@@ -453,22 +424,18 @@ class GameViewModel(
 
         when {
             isPlayer1Out && isPlayer2Out -> {
-                // Her iki oyuncu bitirdiyse sadece ceza puanları düşülür
                 player1Score -= penalty1
                 player2Score -= penalty2
             }
             isPlayer1Out -> {
-                // Player 1 bitti → rakibin harflerinin puanını kazanır
                 player1Score += penalty2
                 player2Score -= penalty2
             }
             isPlayer2Out -> {
-                // Player 2 bitti → rakibin harflerinin puanını kazanır
                 player2Score += penalty1
                 player1Score -= penalty1
             }
             else -> {
-                // Her iki oyuncuda harf varsa ama oyun sonlanıyorsa (örneğin 4 pas) → ikisi de ceza alır
                 player1Score -= penalty1
                 player2Score -= penalty2
             }
@@ -477,7 +444,7 @@ class GameViewModel(
         val winnerId = when {
             player1Score > player2Score -> game.player1Id
             player2Score > player1Score -> game.player2Id
-            else -> null // Beraberlik
+            else -> null
         }
 
         val finalGame = game.copy(
@@ -511,14 +478,12 @@ class GameViewModel(
         val pendingMoves = currentGame.pendingMoves
         val newValidPositions = mutableSetOf<Position>()
 
-        // ❗ Bölge blok kontrolü
         val areaBlocked = currentGame.areaBlockActivatedBy != null &&
                 currentGame.areaBlockSide != null &&
                 currentGame.areaBlockActivatedBy != currentUserId
 
-        val restrictedSide = currentGame.areaBlockSide // "left" or "right"
+        val restrictedSide = currentGame.areaBlockSide
 
-        // ❗ Yasağı ihlal ediyor mu?
         fun isBlocked(col: Int): Boolean {
             return when {
                 !areaBlocked -> false
@@ -537,7 +502,6 @@ class GameViewModel(
             } else null
         }
 
-        // 🚩 1. İlk hamle
         if (pendingMoves.isEmpty()) {
             val centerTile = board["7-7"]
             if (centerTile?.letter.isNullOrEmpty()) {
@@ -548,7 +512,6 @@ class GameViewModel(
                 return
             }
 
-            // 🚩 2. Tahtada harf var ama bu turda hamle yapılmamış
             for (row in 0..14) {
                 for (col in 0..14) {
                     val key = "$row-$col"
@@ -576,7 +539,6 @@ class GameViewModel(
             return
         }
 
-        // 🚩 3. Tek harf
         if (placedPositions.size == 1) {
             val origin = placedPositions.first()
             val directions = listOf(
@@ -588,7 +550,6 @@ class GameViewModel(
                 var r = origin.row
                 var c = origin.col
 
-                // Önce bu yönde dolu harfler boyunca ilerle
                 while (true) {
                     val nextR = r + dr
                     val nextC = c + dc
@@ -600,7 +561,6 @@ class GameViewModel(
                     } else break
                 }
 
-                // İlk boş hücreye izin ver
                 val nextR = r + dr
                 val nextC = c + dc
                 if (nextR in 0..14 && nextC in 0..14 && !isBlocked(nextC)) {
@@ -616,7 +576,6 @@ class GameViewModel(
         }
 
 
-        // 🚩 4. İki veya daha fazla harf
         val direction = detectDirection(placedPositions.toSet()) ?: return
         val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
 
@@ -712,7 +671,6 @@ class GameViewModel(
         return drawn
     }
 
-    // Method to activate area block
     fun activateAreaBlock(side: String) {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch

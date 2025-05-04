@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,11 +62,9 @@ fun QueueScreen(
         }
     }
 
-    // Oyun ID'sini dinliyoruz
     val gameId by viewModel.gameId.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
 
-    // gameId veya isSearching değiştiğinde bildirimi göster
     LaunchedEffect(gameId, isSearching) {
         Log.d("QueueScreen", "🔵 LaunchedEffect: gameId=$gameId, isSearching=$isSearching")
 
@@ -94,7 +91,7 @@ fun QueueScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFF8E1)) // Beyaza yakın sıcak arka plan
+            .background(Color(0xFFFFF8E1))
     ) {
         FloatingLettersBackground()
 
@@ -128,7 +125,7 @@ fun QueueScreen(
                             text = "Oyun Aranıyor",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF6A1B9A) // Ana mor renk
+                            color = Color(0xFF6A1B9A)
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -136,7 +133,7 @@ fun QueueScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFE1BEE7) // Açık mor arka plan
+                                containerColor = Color(0xFFE1BEE7)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -165,7 +162,6 @@ fun QueueScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Animasyonlu daireler
                         Box(
                             modifier = Modifier
                                 .size(120.dp)
@@ -227,7 +223,7 @@ fun QueueScreen(
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFF3E5F5) // Çok açık mor
+                                containerColor = Color(0xFFF3E5F5)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -269,7 +265,7 @@ fun QueueScreen(
                                 .height(60.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.elevatedButtonColors(
-                                containerColor = Color(0xFFF44336), // Kırmızı
+                                containerColor = Color(0xFFF44336),
                                 contentColor = Color.White
                             )
                         ) {
@@ -291,7 +287,7 @@ fun QueueScreen(
                     .padding(24.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE8F5E9) // Açık yeşil arka plan
+                    containerColor = Color(0xFFE8F5E9)
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -305,7 +301,7 @@ fun QueueScreen(
                         text = "🎉 Karşılaşma Bulundu!",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50) // Yeşil metin
+                        color = Color(0xFF4CAF50)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -313,7 +309,7 @@ fun QueueScreen(
                     Text(
                         text = "Hazırlanıyor...",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFF388E3C) // Daha koyu yeşil metin
+                        color = Color(0xFF388E3C)
                     )
                 }
             }

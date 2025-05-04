@@ -20,7 +20,6 @@ fun FloatingLettersBackground() {
             "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z")
     }
 
-    // Increased number of letters from 20 to 40
     val letterData = remember {
         List(40) {
             LetterData(
@@ -32,15 +31,12 @@ fun FloatingLettersBackground() {
         }
     }
 
-    // Animations for each letter
     val letterPositions = letterData.map {
         val xAnimation = remember { Animatable(it.initialX) }
         val yAnimation = remember { Animatable(it.initialY) }
 
-        // Animate each letter
         LaunchedEffect(key1 = it) {
             while (true) {
-                // Animate to a new random position
                 launch {
                     xAnimation.animateTo(
                         targetValue = Random.nextFloat(),
@@ -78,7 +74,7 @@ fun FloatingLettersBackground() {
                 letterData.x * this.size.width,
                 letterData.y * this.size.height,
                 android.graphics.Paint().apply {
-                    // Increased opacity from 40 to 80 (more visible)
+
                     color = android.graphics.Color.argb(80, 0, 0, 255)
                     textSize = letterData.size
                     isAntiAlias = true
@@ -88,7 +84,6 @@ fun FloatingLettersBackground() {
     }
 }
 
-// Simple data class to hold letter properties
 data class LetterData(
     val letter: String,
     val initialX: Float,
@@ -96,7 +91,6 @@ data class LetterData(
     val size: Float
 )
 
-// Data class for animated letter data
 data class AnimatedLetterData(
     val letter: String,
     val x: Float,

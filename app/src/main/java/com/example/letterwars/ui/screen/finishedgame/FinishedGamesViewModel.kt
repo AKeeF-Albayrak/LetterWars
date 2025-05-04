@@ -19,7 +19,6 @@ sealed class FinishedGamesUiState {
     object Empty : FinishedGamesUiState()
 }
 
-// Oyun bilgilerini daha detaylı tutacak veri sınıfı
 data class GameInfo(
     val result: GameResult,
     val timestamp: Long,
@@ -47,7 +46,7 @@ class FinishedGamesViewModel : ViewModel() {
             ?: return@launch _uiState.run { value = FinishedGamesUiState.Error("Kullanıcı oturumu bulunamadı") }
 
         try {
-            // FINISHED durumundaki ve kullanıcının taraf olduğu tüm maçlar
+
             val p1 = db.collection("games")
                 .whereEqualTo("player1Id", currentUserId)
                 .whereEqualTo("status", "FINISHED")
@@ -77,16 +76,14 @@ class FinishedGamesViewModel : ViewModel() {
 
                 val result = when {
                     winnerId == currentUserId -> GameResult.WIN
-                    winnerId.isNullOrBlank() -> GameResult.DRAW   // boş bırakıldıysa berabere
-                    winnerId.equals("DRAW", true) -> GameResult.DRAW   // "DRAW" sabiti kullanıldıysa
+                    winnerId.isNullOrBlank() -> GameResult.DRAW
+                    winnerId.equals("DRAW", true) -> GameResult.DRAW
                     else -> GameResult.LOSS
                 }
 
-                // Kullanıcı bilgilerini almak için Firestore sorguları
                 val playerUserFuture = db.collection("users").document(playerId).get().await()
                 val opponentUserFuture = db.collection("users").document(opponentId).get().await()
 
-                // Kullanıcı adlarını al (varsayılan değerler kullanarak)
                 val playerUsername = playerUserFuture.getString("username")
                     ?: playerUserFuture.getString("email")
                     ?: "Oyuncu"
@@ -95,7 +92,6 @@ class FinishedGamesViewModel : ViewModel() {
                     ?: opponentUserFuture.getString("email")
                     ?: "Rakip"
 
-                // Oyun bilgilerini GameInfo nesnesine dönüştür
                 GameInfo(
                     result = result,
                     timestamp = timestamp,
@@ -110,7 +106,7 @@ class FinishedGamesViewModel : ViewModel() {
                 _uiState.value = FinishedGamesUiState.Empty
             } else {
                 _uiState.value = FinishedGamesUiState.Success(
-                    gameInfoListFuture.sortedByDescending { it.timestamp }   // en yeni üstte
+                    gameInfoListFuture.sortedByDescending { it.timestamp }
                 )
             }
 

@@ -74,7 +74,7 @@ fun UserProfileScreen(
                 Divider(color = Color.LightGray, thickness = 1.dp)
             }
         },
-        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan
+        containerColor = Color(0xFFFFF8E1)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -90,7 +90,6 @@ fun UserProfileScreen(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Kullanıcı profil kısmı
                     user?.let { u ->
                         ProfileHeader(u)
                         Spacer(modifier = Modifier.height(24.dp))
@@ -104,7 +103,6 @@ fun UserProfileScreen(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Çıkış Yap düğmesi
                     ElevatedButton(
                         onClick = {
                             viewModel.signOut()
@@ -114,7 +112,7 @@ fun UserProfileScreen(
                             .fillMaxWidth()
                             .height(60.dp),
                         colors = ButtonDefaults.elevatedButtonColors(
-                            containerColor = Color(0xFFF44336), // Kırmızı
+                            containerColor = Color(0xFFF44336),
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(16.dp)
@@ -145,14 +143,13 @@ private fun ProfileHeader(user: User) {
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFFD54F) // HomeScreen'deki UserInfoCard ile aynı renk
+            containerColor = Color(0xFFFFD54F)
         )
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profil avatarı
             Box(
                 modifier = Modifier
                     .size(96.dp)
@@ -170,7 +167,6 @@ private fun ProfileHeader(user: User) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Kullanıcı adı - metni ortalı
             Text(
                 text = user.username,
                 style = MaterialTheme.typography.headlineSmall,
@@ -182,7 +178,6 @@ private fun ProfileHeader(user: User) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Email - satırı ortalı
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -229,7 +224,7 @@ private fun StatsSection(user: User) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // İstatistikler - geliştirilmiş tasarım
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly

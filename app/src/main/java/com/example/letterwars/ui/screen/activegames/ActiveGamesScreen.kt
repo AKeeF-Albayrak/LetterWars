@@ -75,7 +75,7 @@ fun ActiveGamesScreen(
                 Divider(color = Color.LightGray, thickness = 1.dp)
             }
         },
-        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan rengi
+        containerColor = Color(0xFFFFF8E1)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -100,7 +100,7 @@ fun ActiveGamesScreen(
                         ActiveGamesList(
                             games = state.gameInfoList,
                             onContinue = { gameId ->
-                                navController.navigate("game/$gameId") // rotanızı buraya koyun
+                                navController.navigate("game/$gameId")
                             }
                         )
                     }
@@ -164,7 +164,7 @@ fun ActiveGamesScreen(
 @Composable
 private fun ActiveGamesList(
     games: List<ActiveGameInfo>,
-    onContinue: (String) -> Unit,                 // <<<
+    onContinue: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -172,7 +172,7 @@ private fun ActiveGamesList(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(games) { game ->
-            ActiveGameItem(game, onContinue)      // <<<
+            ActiveGameItem(game, onContinue)
         }
     }
 }
@@ -180,7 +180,7 @@ private fun ActiveGamesList(
 @Composable
 private fun ActiveGameItem(
     info: ActiveGameInfo,
-    onContinue: (String) -> Unit                  // <<<
+    onContinue: (String) -> Unit
 ) {
     val yourTurn       = info.isYourTurn
     val backgroundTint = if (yourTurn) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
@@ -250,10 +250,9 @@ private fun ActiveGameItem(
 
             Spacer(Modifier.height(12.dp))
 
-            /* ---------- Devam Et butonu ---------- */
             ElevatedButton(
                 onClick  = { onContinue(info.gameId) },
-                enabled  = yourTurn,                       // sadece sıra sende iken tıklanabilir
+                enabled  = yourTurn,
                 shape    = RoundedCornerShape(12.dp),
                 colors   = ButtonDefaults.elevatedButtonColors(
                     containerColor = if (yourTurn) Color(0xFF4CAF50) else Color.LightGray,

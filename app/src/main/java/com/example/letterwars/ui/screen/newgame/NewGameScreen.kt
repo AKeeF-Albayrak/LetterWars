@@ -71,17 +71,15 @@ fun NewGameScreen(
                 Divider(color = Color.LightGray, thickness = 1.dp)
             }
         },
-        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan
+        containerColor = Color(0xFFFFF8E1)
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            // Floating letters background - mevcut implementasyonu koruyoruz
             FloatingLettersBackground()
 
-            // Ana içerik
             Box(
                 modifier = Modifier
                     .padding(16.dp)
@@ -108,7 +106,6 @@ fun NewGameScreen(
                                 .padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Hızlı Oyun Bölümü
                             GameTypeSection(
                                 title = "Hızlı Oyun",
                                 description = "Kısa sürede hızlı oyunlar için ideal"
@@ -143,7 +140,6 @@ fun NewGameScreen(
 
                             Spacer(modifier = Modifier.height(32.dp))
 
-                            // Genişletilmiş Oyun Bölümü
                             GameTypeSection(
                                 title = "Genişletilmiş Oyun",
                                 description = "Uzun süreli stratejik oyunlar için"
@@ -178,17 +174,15 @@ fun NewGameScreen(
 
                             Spacer(modifier = Modifier.height(24.dp))
 
-                            // Sıraya Gir düğmesi - Ana ekrandaki düğme stilini kullanıyoruz
                             ElevatedButton(
                                 onClick = {
-                                    // Navigate to queue with default duration (5 minutes)
                                     navController.navigate("queue?duration=5")
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(60.dp),
                                 colors = ButtonDefaults.elevatedButtonColors(
-                                    containerColor = Color(0xFFFF8A65), // HomeScreen'deki "Yeni Oyun" butonu rengi
+                                    containerColor = Color(0xFFFF8A65),
                                     contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(16.dp)
@@ -219,7 +213,7 @@ fun GameTypeSection(title: String, description: String) {
             text = title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF6A1B9A) // Ana mor renk
+            color = Color(0xFF6A1B9A)
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -227,7 +221,7 @@ fun GameTypeSection(title: String, description: String) {
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color(0xFF757575) // Hafif gri
+            color = Color(0xFF757575)
         )
     }
 }

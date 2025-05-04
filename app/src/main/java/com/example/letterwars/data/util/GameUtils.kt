@@ -119,32 +119,47 @@ val letterPoints: Map<Char, Int> = mapOf(
     'Ü' to 3, 'V' to 7, 'Y' to 3, 'Z' to 4, '*' to 0
 )
 
-fun resolveWord(board: Map<String, GameTile>, placed: Set<Position>, direction: String): WordInfo {
+fun resolveWord(board: Map<String, GameTile>, placed: Set<Position>, direction: String?): WordInfo {
     val start = placed.minWith(compareBy({ it.row }, { it.col }))
-    val (drList, dcList) = when (direction) {
-        "horizontal" -> listOf(0 to -1, 0 to 1)
-        "vertical" -> listOf(-1 to 0, 1 to 0)
-        "diagonal-main" -> listOf(-1 to -1, 1 to 1)
-        "diagonal-anti" -> listOf(-1 to 1, 1 to -1)
-        else -> return WordInfo("", emptyList())
-    }.unzip()
 
-    val positions = mutableSetOf<Position>()
-    for ((dr, dc) in drList.zip(dcList)) {
-        var r = start.row
-        var c = start.col
-        while (true) {
-            r += dr
-            c += dc
-            val tile = board["$r-$c"]
-            if (tile?.letter != null) positions.add(Position(r, c)) else break
-        }
+    val directions = when (direction) {
+        "horizontal" -> listOf("horizontal")
+        "vertical" -> listOf("vertical")
+        "diagonal-main" -> listOf("diagonal-main")
+        "diagonal-anti" -> listOf("diagonal-anti")
+        else -> listOf("horizontal", "vertical", "diagonal-main", "diagonal-anti")
     }
 
-    positions.addAll(placed)
-    val sorted = positions.toList().distinct().sortedWith(compareBy({ it.row }, { it.col }))
-    val word = sorted.joinToString("") { board["${it.row}-${it.col}"]?.letter ?: "" }
-    return WordInfo(word, sorted)
+    fun collectWord(dir: String): WordInfo {
+        val (drList, dcList) = when (dir) {
+            "horizontal" -> listOf(0 to -1, 0 to 1)
+            "vertical" -> listOf(-1 to 0, 1 to 0)
+            "diagonal-main" -> listOf(-1 to -1, 1 to 1)
+            "diagonal-anti" -> listOf(-1 to 1, 1 to -1)
+            else -> return WordInfo("", emptyList())
+        }.unzip()
+
+        val positions = mutableSetOf<Position>()
+        for ((dr, dc) in drList.zip(dcList)) {
+            var r = start.row
+            var c = start.col
+            while (true) {
+                r += dr
+                c += dc
+                val tile = board["$r-$c"]
+                if (tile?.letter != null) positions.add(Position(r, c)) else break
+            }
+        }
+
+        positions.addAll(placed)
+        val sorted = positions.toList().distinct().sortedWith(compareBy({ it.row }, { it.col }))
+        val word = sorted.joinToString("") { board["${it.row}-${it.col}"]?.letter ?: "" }
+        return WordInfo(word, sorted)
+    }
+
+    return directions
+        .map { collectWord(it) }
+        .maxByOrNull { it.positions.size } ?: WordInfo("", emptyList())
 }
 
 fun findCrossWords(
@@ -221,12 +236,10 @@ fun calculateScore(
         val isMainWord = index == 0
         val tiles = word.positions.map { pos -> board["${pos.row}-${pos.col}"] }
 
-        // ⛔ Kelime İptali: Ana kelime iptal edilmişse → 0 puan
         if (isMainWord && tiles.any { it?.mineType == MineType.WORD_CANCEL }) {
             return 0
         }
 
-        // 🟣 Bonus İptali kontrolü (ana kelime için)
         if (isMainWord) {
             bonusCancelled = tiles.any { it?.mineType == MineType.BONUS_CANCEL }
         }
@@ -259,7 +272,6 @@ fun calculateScore(
 
         var finalScore = wordScore * wordMultiplier
 
-        // 🔻 Puan Bölünmesi (ana kelime için)
         if (isMainWord && tiles.any { it?.mineType == MineType.POINT_DIVISION }) {
             finalScore = (finalScore * 0.3).toInt()
         }

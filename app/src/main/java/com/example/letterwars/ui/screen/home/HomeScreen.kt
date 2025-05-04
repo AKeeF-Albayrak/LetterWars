@@ -73,7 +73,7 @@ fun HomeScreen(
                 Divider(color = Color.LightGray, thickness = 1.dp)
             }
         },
-        containerColor = Color(0xFFFFF8E1) // Beyaza yakın sıcak arka plan
+        containerColor = Color(0xFFFFF8E1)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -114,10 +114,10 @@ fun UserInfoCard(user: User) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp), // Hafif daha büyük gölge
-        shape = RoundedCornerShape(16.dp), // Daha yuvarlak kenarlar
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFFD54F) // Beyaz arka plan (daha temiz)
+            containerColor = Color(0xFFFFD54F)
         )
     ) {
         Column(
@@ -130,7 +130,7 @@ fun UserInfoCard(user: User) {
                 imageVector = Icons.Default.Done,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = Color(0xFF6A1B9A) // Mor renk ikon
+                tint = Color(0xFF6A1B9A)
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -139,7 +139,7 @@ fun UserInfoCard(user: User) {
                 text = "Hoş geldin, ${user.username}",
                 style = MaterialTheme.typography.headlineSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF333333) // Daha koyu, net yazı
+                    color = Color(0xFF333333)
                 )
             )
 
@@ -148,7 +148,7 @@ fun UserInfoCard(user: User) {
             Text(
                 text = "Başarı Oranı",
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = Color(0xFF757575) // Hafif gri
+                    color = Color(0xFF757575)
                 )
             )
 
@@ -158,7 +158,7 @@ fun UserInfoCard(user: User) {
                 text = "%$winRate",
                 style = MaterialTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF3E3E3E) // Koyu renk
+                    color = Color(0xFF3E3E3E)
                 )
             )
         }
@@ -176,14 +176,13 @@ fun GameActionButtons(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // YENİ OYUN - Turuncu-kırmızı karışımı
         ElevatedButton(
             onClick = onStartNewGame,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp),
             colors = ButtonDefaults.elevatedButtonColors(
-                containerColor = Color(0xFFFF8A65), // Canlı kırmızımsı turuncu
+                containerColor = Color(0xFFFF8A65),
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape(16.dp)
@@ -200,14 +199,13 @@ fun GameActionButtons(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // AKTİF OYUNLAR - Morumsu pembe
         ElevatedButton(
             onClick = onViewActiveGames,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp),
             colors = ButtonDefaults.elevatedButtonColors(
-                containerColor = Color(0xFFBA68C8), // Canlı mor-pembe karışımı
+                containerColor = Color(0xFFBA68C8),
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape(16.dp)
@@ -224,14 +222,13 @@ fun GameActionButtons(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // BİTEN OYUNLAR - Mor-mavi karışımı
         ElevatedButton(
             onClick = onViewFinishedGames,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp),
             colors = ButtonDefaults.elevatedButtonColors(
-                containerColor = Color(0xFF9575CD), // Canlı morumsu mavi karışımı
+                containerColor = Color(0xFF9575CD),
                 contentColor = Color.White
             ),
             shape = RoundedCornerShape(16.dp)

@@ -7,7 +7,6 @@ import com.example.letterwars.data.util.generateEmptyBoard
 import com.example.letterwars.data.util.generateLetterPool
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -159,12 +158,10 @@ class FireBaseGameDataSource(
                 if (snapshot != null && snapshot.exists()) {
                     val game = snapshot.toObject(Game::class.java)
                     if (game != null) {
-                        // Süresi dolmuş efektleri kontrol et
                         val currentTime = System.currentTimeMillis()
                         var needsUpdate = false
                         var updatedGame = game
 
-                        // Bölge bloklamasının süresini kontrol et
                         if (game.areaBlockExpiresAt != null && game.areaBlockExpiresAt < currentTime) {
                             updatedGame = updatedGame.copy(
                                 areaBlockActivatedBy = null,
@@ -175,7 +172,6 @@ class FireBaseGameDataSource(
                         }
 
                         if (needsUpdate) {
-                            // updateGame suspend fonksiyonunu bir coroutine içinde çağır
                             kotlinx.coroutines.GlobalScope.launch {
                                 updateGame(updatedGame)
                             }
@@ -194,7 +190,6 @@ class FireBaseGameDataSource(
     ): ListenerRegistration {
         Log.d("FireBaseGameDataSource", "🔵 listenForGameForPlayer başlatıldı: $playerId")
 
-        // Tüm oyunları dinliyoruz ve client-side filtreleme yapıyoruz
         return firestore.collection("games")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
@@ -205,18 +200,16 @@ class FireBaseGameDataSource(
                 if (snapshot != null && !snapshot.isEmpty) {
                     Log.d("FireBaseGameDataSource", "🔵 Dinleyici: ${snapshot.size()} adet oyun bulundu")
 
-                    // Şu anki zaman
+
                     val currentTime = System.currentTimeMillis()
 
                     for (doc in snapshot.documents) {
                         val game = doc.toObject(Game::class.java)
                         if (game != null) {
-                            // Bu oyun bu oyuncuyu içeriyor mu ve yeni mi başladı?
                             val isPlayer1 = game.player1Id == playerId
                             val isPlayer2 = game.player2Id == playerId
                             val isInProgress = game.status == GameStatus.IN_PROGRESS
 
-                            // Son 30 saniye içinde başlamış oyunlar
                             val isRecentlyStarted = (currentTime - game.startTimeMillis) < 30000L
 
                             Log.d("FireBaseGameDataSource", "🔵 Oyun: ${game.gameId}, " +
@@ -277,7 +270,6 @@ class FireBaseGameDataSource(
             val drawnLetters2 = drawLetters(letterPool, 7)
             val currentTime = System.currentTimeMillis()
 
-            // Mayın ve ödül içeren tahta oluştur
             val boardWithEffects = generateBoardWithEffects()
 
             val game = Game(
@@ -295,7 +287,6 @@ class FireBaseGameDataSource(
                 moveHistory = mutableListOf(),
                 createdAt = currentTime,
                 players = listOf(playerId),
-                // Mayın ve Ödül sistemi için varsayılan değerler
                 areaBlockActivatedBy = null,
                 areaBlockSide = null,
                 areaBlockExpiresAt = null,
@@ -363,7 +354,6 @@ class FireBaseGameDataSource(
                     return@runTransaction false
                 }
 
-                // Mevcut oyunculara 2. oyuncuyu da ekle
                 val updatedPlayers = freshGame.players.toMutableList().apply {
                     if (!contains(player2Id)) add(player2Id)
                 }
@@ -415,7 +405,7 @@ class FireBaseGameDataSource(
             count
         } catch (e: Exception) {
             Log.e("FireBaseGameDataSource", "❌ getWaitingGamesCount hatası: ${e.message}")
-            0 // Hata durumunda 0 dön
+            0
         }
     }
 
@@ -433,9 +423,7 @@ class FireBaseGameDataSource(
         }
     }
 
-    // Mayın ve Ödül sistemi için yeni eklenen fonksiyonlar
 
-    // Bölge blok durumunu günceller
     suspend fun updateAreaBlock(
         gameId: String,
         activatedBy: String?,
@@ -458,7 +446,6 @@ class FireBaseGameDataSource(
         }
     }
 
-    // Dondurulmuş harf durumunu günceller
     suspend fun updateFrozenLetters(
         gameId: String,
         frozenIndices: List<Int>,
@@ -481,7 +468,6 @@ class FireBaseGameDataSource(
         }
     }
 
-    // Ekstra tur durumunu günceller
     suspend fun updateExtraTurn(gameId: String, playerId: String?) {
         try {
             firestore.collection("games")
@@ -493,11 +479,9 @@ class FireBaseGameDataSource(
         }
     }
 
-    // Mayın ve ödülleri içeren bir tahta oluşturur
     private fun generateBoardWithEffects(): Map<String, GameTile> {
         val board = generateEmptyBoard().toMutableMap()
 
-        // Mayınları ekle - her türden 3 tane
         val mineTypes = listOf(
             MineType.POINT_DIVISION,
             MineType.POINT_TRANSFER,
@@ -506,14 +490,13 @@ class FireBaseGameDataSource(
             MineType.WORD_CANCEL
         )
 
-        val minePositions = getRandomBoardPositions(15) // Her türden 3 tane = 15 toplam
+        val minePositions = getRandomBoardPositions(15)
 
         minePositions.forEachIndexed { index, position ->
             val row = position.first
             val col = position.second
             val key = "$row-$col"
 
-            // Zaten özel hücre ise veya merkez hücre ise, mayın eklemeyi atla
             val currentTile = board[key]
             if (currentTile?.cellType == CellType.NORMAL && !(row == 7 && col == 7)) {
                 val mineType = mineTypes[index % mineTypes.size]
@@ -525,14 +508,12 @@ class FireBaseGameDataSource(
             }
         }
 
-        // Ödülleri ekle - 2 AREA_BLOCK, 3 LETTER_FREEZE, 2 EXTRA_TURN
         val rewardTypes = listOf(
             RewardType.AREA_BLOCK, RewardType.AREA_BLOCK,
             RewardType.LETTER_FREEZE, RewardType.LETTER_FREEZE, RewardType.LETTER_FREEZE,
             RewardType.EXTRA_TURN, RewardType.EXTRA_TURN
         )
 
-        // Mayınların olduğu konumları hariç tut
         val usedPositions = minePositions.toMutableList()
 
         rewardTypes.forEachIndexed { index, rewardType ->
@@ -543,7 +524,6 @@ class FireBaseGameDataSource(
             val col = position.second
             val key = "$row-$col"
 
-            // Zaten özel hücre ise veya merkez hücre ise, ödül eklemeyi atla
             val currentTile = board[key]
             if (currentTile?.cellType == CellType.NORMAL && !(row == 7 && col == 7)) {
                 board[key] = GameTile(
@@ -557,17 +537,14 @@ class FireBaseGameDataSource(
         return board
     }
 
-    // Rastgele tahta konumları üretir (belirli konumları hariç tutarak)
     private fun getRandomBoardPositions(count: Int, exclude: List<Pair<Int, Int>> = emptyList()): List<Pair<Int, Int>> {
         val positions = mutableListOf<Pair<Int, Int>>()
         val availablePositions = mutableListOf<Pair<Int, Int>>()
 
-        // Tüm olası konumları oluştur
         for (i in 0..14) {
             for (j in 0..14) {
                 val pos = Pair(i, j)
 
-                // Merkezi ve özel hücreleri hariç tut
                 val isCenterCell = i == 7 && j == 7
                 val isSpecialCell = isSpecialCell(i, j)
 
@@ -577,16 +554,13 @@ class FireBaseGameDataSource(
             }
         }
 
-        // Konumları karıştır
         availablePositions.shuffle()
 
-        // İlk 'count' adet konumu al
         positions.addAll(availablePositions.take(count))
 
         return positions
     }
 
-    // Tek bir rastgele konum üretir (belirli konumları hariç tutarak)
     private fun getRandomBoardPosition(exclude: List<Pair<Int, Int>> = emptyList()): Pair<Int, Int> {
         val positions = getRandomBoardPositions(1, exclude)
         return positions.firstOrNull() ?: Pair(
@@ -595,16 +569,14 @@ class FireBaseGameDataSource(
         )
     }
 
-    // Hücrenin özel olup olmadığını kontrol eder (2L, 3L, 2W, 3W)
+
     private fun isSpecialCell(row: Int, col: Int): Boolean {
-        // Triple Word Score hücreleri
         if ((row == 0 && col == 0) || (row == 0 && col == 7) || (row == 0 && col == 14) ||
             (row == 7 && col == 0) || (row == 7 && col == 14) ||
             (row == 14 && col == 0) || (row == 14 && col == 7) || (row == 14 && col == 14)) {
             return true
         }
 
-        // Double Word Score hücreleri
         if ((row == 1 && col == 1) || (row == 2 && col == 2) || (row == 3 && col == 3) || (row == 4 && col == 4) ||
             (row == 10 && col == 10) || (row == 11 && col == 11) || (row == 12 && col == 12) || (row == 13 && col == 13) ||
             (row == 1 && col == 13) || (row == 2 && col == 12) || (row == 3 && col == 11) || (row == 4 && col == 10) ||
@@ -612,7 +584,6 @@ class FireBaseGameDataSource(
             return true
         }
 
-        // Triple Letter Score hücreleri
         if ((row == 1 && col == 5) || (row == 1 && col == 9) ||
             (row == 5 && col == 1) || (row == 5 && col == 5) || (row == 5 && col == 9) || (row == 5 && col == 13) ||
             (row == 9 && col == 1) || (row == 9 && col == 5) || (row == 9 && col == 9) || (row == 9 && col == 13) ||
@@ -620,7 +591,6 @@ class FireBaseGameDataSource(
             return true
         }
 
-        // Double Letter Score hücreleri
         if ((row == 0 && col == 3) || (row == 0 && col == 11) ||
             (row == 2 && col == 6) || (row == 2 && col == 8) ||
             (row == 3 && col == 0) || (row == 3 && col == 7) || (row == 3 && col == 14) ||
