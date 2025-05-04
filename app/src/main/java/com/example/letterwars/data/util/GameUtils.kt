@@ -140,6 +140,7 @@ fun resolveWord(board: Map<String, GameTile>, placed: Set<Position>, direction: 
         }.unzip()
 
         val positions = mutableSetOf<Position>()
+
         for ((dr, dc) in drList.zip(dcList)) {
             var r = start.row
             var c = start.col
@@ -147,14 +148,25 @@ fun resolveWord(board: Map<String, GameTile>, placed: Set<Position>, direction: 
                 r += dr
                 c += dc
                 val tile = board["$r-$c"]
-                if (tile?.letter != null) positions.add(Position(r, c)) else break
+                if (tile?.letter != null) {
+                    positions.add(Position(r, c))
+                } else break
             }
         }
 
         positions.addAll(placed)
+
         val sorted = positions.toList().distinct().sortedWith(compareBy({ it.row }, { it.col }))
         val word = sorted.joinToString("") { board["${it.row}-${it.col}"]?.letter ?: "" }
+
         return WordInfo(word, sorted)
+    }
+
+    if (placed.size == 1) {
+        val onlyPos = placed.first()
+        val tile = board["${onlyPos.row}-${onlyPos.col}"]
+        val word = tile?.letter ?: ""
+        return WordInfo(word, listOf(onlyPos))
     }
 
     return directions
@@ -204,15 +216,23 @@ fun checkWords(
     placedLetters: Map<Position, RackLetter>
 ): List<WordInfo>? {
     if (placedLetters.isEmpty()) return null
+
+    val tempBoard = board.toMutableMap()
+    for ((pos, rackLetter) in placedLetters) {
+        val originalCellType = board["${pos.row}-${pos.col}"]?.cellType ?: CellType.NORMAL
+        tempBoard["${pos.row}-${pos.col}"] = GameTile(letter = rackLetter.letter, cellType = originalCellType)
+    }
+
+
     val direction = detectDirection(placedLetters.keys) ?: return null
 
     val allWords = mutableListOf<WordInfo>()
 
-    val mainWord = resolveWord(board, placedLetters.keys, direction)
+    val mainWord = resolveWord(tempBoard, placedLetters.keys, direction)
     if (!checkWord(context, mainWord.word)) return null
     allWords.add(mainWord)
 
-    val crossWords = findCrossWords(board, placedLetters, direction)
+    val crossWords = findCrossWords(tempBoard, placedLetters, direction)
     for (w in crossWords) {
         if (!checkWord(context, w.word)) return null
         allWords.add(w)
@@ -220,7 +240,6 @@ fun checkWords(
 
     return allWords
 }
-
 fun calculateScore(
     board: Map<String, GameTile>,
     placedLetters: Map<Position, RackLetter>,
