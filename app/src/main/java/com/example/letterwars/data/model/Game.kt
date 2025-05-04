@@ -29,8 +29,6 @@ data class Game(
     val areaBlockActivatedBy: String? = null,
     val areaBlockSide: String? = null, // "left" or "right"
     val areaBlockExpiresAt: Long? = null,
-    val frozenLetterIndices: List<Int> = emptyList(),
-    val frozenLettersPlayerId: String? = null,
-    val frozenLettersExpiresAt: Long? = null,
+    val frozenLettersEffects: List<FrozenLettersEffect> = emptyList(),
     val extraTurnForPlayerId: String? = null
 )

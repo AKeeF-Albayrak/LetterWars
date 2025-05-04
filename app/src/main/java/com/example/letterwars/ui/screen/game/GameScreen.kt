@@ -36,6 +36,7 @@
     import androidx.compose.ui.unit.IntOffset
     import androidx.compose.ui.unit.dp
     import androidx.compose.ui.unit.sp
+    import androidx.lifecycle.ViewModel
     import androidx.lifecycle.viewmodel.compose.viewModel
     import androidx.navigation.NavController
     import com.example.letterwars.data.model.*
@@ -69,6 +70,8 @@
         var draggedLetter by remember { mutableStateOf<DraggedLetter?>(null) }
         var dragOffset by remember { mutableStateOf(Offset.Zero) }
         var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
+
+
 
         val currentDragTargetCell = remember { mutableStateOf<Position?>(null) }
 
@@ -198,10 +201,17 @@
             foundCell
         }
 
+        val frozenIndices = remember(gameState) {
+            val currentPlayerId = viewModel.currentUserId
+            gameState?.frozenLettersEffects
+                ?.firstOrNull { it.playerId == currentPlayerId }
+                ?.letterIndices ?: emptyList()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color(0xFF2C003E))
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -349,6 +359,26 @@
                                 }
                             )
                         }
+                        else
+                        {
+                            RewardActionsCard(
+                                areaBlockCount = 2,
+                                letterFreezeCount = 3,
+                                extraTurnCount = 1,
+                                onAreaBlock = { /* ViewModel.activateAreaBlock("left" | "right") */ },
+                                onLetterFreeze = {
+                                    val opponentLetters = if (viewModel.currentUserId == gameState?.player1Id) {
+                                        gameState?.currentLetters2 ?: emptyList()
+                                    } else {
+                                        gameState?.currentLetters1 ?: emptyList()
+                                    }
+
+                                    val indices = opponentLetters.indices.shuffled().take(2)
+                                    viewModel.activateLetterFreeze()
+                                },
+                                onExtraTurn = { viewModel.activateExtraTurn() }
+                            )
+                        }
 
                         Spacer(modifier = Modifier.weight(1f))
 
@@ -356,6 +386,7 @@
                             letters = rackLetters,
                             selectedLetter = selectedLetter,
                             isPlayerTurn = isPlayerTurn,
+                            frozenIndices = frozenIndices,
                             onLetterClick = { letter, points, index ->
                                 if (selectedLetter.value?.rackIndex == index) {
                                     selectedLetter.value = null
@@ -530,7 +561,7 @@
         onSurrender: () -> Unit,
         onPass: () -> Unit,
         onConfirm: () -> Unit,
-        onUndo: () -> Unit
+        onUndo: () -> Unit,
     ) {
         Card(
             modifier = Modifier
@@ -538,7 +569,7 @@
                 .height(70.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                containerColor = Color(0xFF450149)
             )
         ) {
             Row(
@@ -1050,7 +1081,10 @@
                 .fillMaxWidth()
                 .aspectRatio(1f),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFE1BEE7)
+            )
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
@@ -1072,6 +1106,7 @@
                                 col = j,
                                 currentDragTargetCell = currentDragTargetCell,
                                 validPlacementPositions = validPlacementPositions,
+                                placedLetters = placedLetters,
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1f)
@@ -1101,11 +1136,12 @@
         col: Int,
         currentDragTargetCell: Position?,
         validPlacementPositions: List<Position>,
+        placedLetters: Map<Position, RackLetter>,
         modifier: Modifier = Modifier,
         onClick: () -> Unit
     ) {
         val backgroundColor = when (tile.cellType) {
-            CellType.NORMAL -> MaterialTheme.colorScheme.surface
+            CellType.NORMAL -> Color(0xFFF3E5F5)
             CellType.DOUBLE_LETTER -> Color(0xFFAED6F1)
             CellType.TRIPLE_LETTER -> Color(0xFF5DADE2)
             CellType.DOUBLE_WORD -> Color(0xFFF5CBA7)
@@ -1151,12 +1187,19 @@
             }
             when {
                 placedLetter != null -> {
+                    val isNewlyPlaced = placedLetters.containsKey(Position(row, col))
+                    val letterBackgroundColor = if (isNewlyPlaced) {
+                        Color(0xFFA5D6A7) // Yeşil (bu turda konulan)
+                    } else {
+                        Color(0xFFFFF176) // Sarı (önceden olan)
+                    }
+
                     Box(
                         modifier = Modifier
                             .padding(1.dp)
                             .fillMaxSize()
                             .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFFFFD700)),
+                            .background(letterBackgroundColor),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -1173,6 +1216,7 @@
                         }
                     }
                 }
+
                 !tile.letter.isNullOrEmpty() -> {
                     Text(
                         text = tile.letter,
@@ -1216,6 +1260,7 @@
         letters: MutableList<RackLetter>,
         selectedLetter: MutableState<SelectedLetter?>,
         isPlayerTurn: Boolean,
+        frozenIndices: List<Int>,
         onLetterClick: (String, Int, Int) -> Unit,
         onLetterDragStart: (String, Int, Int, Offset, Offset) -> Unit,
         onLetterDrag: (change: Any, Offset) -> Unit,
@@ -1229,7 +1274,7 @@
                     .height(70.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFBCAAA4)
+                    containerColor = Color(0xFF450149)
                 )
             ) {
                 Row(
@@ -1252,7 +1297,7 @@
                                     letter = letter.letter,
                                     points = letter.points,
                                     isSelected = selectedLetter.value?.rackIndex == i,
-                                    isPlayerTurn = isPlayerTurn,
+                                    isPlayerTurn = isPlayerTurn && !frozenIndices.contains(i),
                                     onClick = {
                                         if (isPlayerTurn) {
                                             onLetterClick(letter.letter, letter.points, i)
@@ -1275,11 +1320,12 @@
                                     }
                                 )
                             } else {
-                                Spacer(
+                                Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(Color(0x33FFFFFF))
+                                        .background(Color.Transparent)
+                                        .border(1.dp, Color.LightGray, RoundedCornerShape(6.dp))
                                 )
                             }
                         }
@@ -1387,6 +1433,60 @@
             )
         }
     }
+
+    @Composable
+    fun RewardActionsCard(
+        areaBlockCount: Int,
+        letterFreezeCount: Int,
+        extraTurnCount: Int,
+        onAreaBlock: () -> Unit,
+        onLetterFreeze: () -> Unit,
+        onExtraTurn: () -> Unit
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(70.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFF450149)
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RewardButton("Harf Yasağı", Icons.Default.Lock, letterFreezeCount, onLetterFreeze)
+                RewardButton("Bölge Yasağı", Icons.Default.Lock, areaBlockCount, onAreaBlock)
+            }
+        }
+    }
+
+    @Composable
+    fun RewardButton(
+        label: String,
+        icon: ImageVector,
+        count: Int,
+        onClick: () -> Unit
+    ) {
+        Button(
+            onClick = onClick,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFF59D)),
+            modifier = Modifier.height(50.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(18.dp))
+                Text(text = label, fontSize = 10.sp, maxLines = 1)
+                Text(text = "x$count", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+
 
 
     data class Size(val width: Float, val height: Float)

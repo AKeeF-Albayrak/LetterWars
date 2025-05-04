@@ -12,7 +12,9 @@ import com.example.letterwars.data.util.checkWords
 import com.example.letterwars.data.util.detectDirection
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class GameViewModel(
@@ -40,6 +42,9 @@ class GameViewModel(
     // Tetiklenen özel efektleri takip etmek için StateFlow
     private val _triggeredEffects = MutableStateFlow<List<TriggeredEffect>>(emptyList())
     val triggeredEffects: StateFlow<List<TriggeredEffect>> = _triggeredEffects
+
+
+
 
     // Tetiklenen efektleri temsil eden veri sınıfı
     data class TriggeredEffect(
@@ -295,7 +300,7 @@ class GameViewModel(
                 add(newMove)
             }
 
-            val updatedGame = currentGame.copy(
+            val updatedGameBeforeClear = currentGame.copy(
                 board = updatedBoard,
                 currentLetters1 = if (currentGame.currentTurnPlayerId == currentGame.player1Id) updatedCurrentLetters else currentGame.currentLetters1,
                 currentLetters2 = if (currentGame.currentTurnPlayerId == currentGame.player2Id) updatedCurrentLetters else currentGame.currentLetters2,
@@ -309,6 +314,7 @@ class GameViewModel(
                 expireTimeMillis = expireTime
             )
 
+            val updatedGame = clearExpiredFreezeEffects(updatedGameBeforeClear)
 
             repository.updateGame(updatedGame)
             _game.value = updatedGame
@@ -398,22 +404,24 @@ class GameViewModel(
                 currentLetters2     = if (currentGame.currentTurnPlayerId == currentGame.player2Id)
                     updatedCurrentLetters else currentGame.currentLetters2,
                 remainingLetters    = updatedRemainingLetters,
-                pendingMoves        = emptyMap(),                // temizlendi
+                pendingMoves        = emptyMap(),
                 startTimeMillis     = currentTime,
                 expireTimeMillis    = expireTime,
                 moveHistory         = updatedMoveHistory
             )
 
+            val updatedGameWithClearedFreezes = clearExpiredFreezeEffects(updatedGame)
+
             val isAllEmptyMoves = updatedMoveHistory.size >= 4 &&
                     updatedMoveHistory.takeLast(4).all { it.word.isEmpty() }
 
             if (isAllEmptyMoves) {
-                concludeGame(updatedGame)
+                concludeGame(updatedGameWithClearedFreezes)
                 return@launch
             }
 
-            repository.updateGame(updatedGame)
-            _game.value = updatedGame
+            repository.updateGame(updatedGameWithClearedFreezes)
+            _game.value = updatedGameWithClearedFreezes
         }
     }
 
@@ -491,6 +499,23 @@ class GameViewModel(
         val pendingMoves = currentGame.pendingMoves
         val newValidPositions = mutableSetOf<Position>()
 
+        // ❗ Bölge blok kontrolü
+        val areaBlocked = currentGame.areaBlockActivatedBy != null &&
+                currentGame.areaBlockSide != null &&
+                currentGame.areaBlockActivatedBy != currentUserId
+
+        val restrictedSide = currentGame.areaBlockSide // "left" or "right"
+
+        // ❗ Yasağı ihlal ediyor mu?
+        fun isBlocked(col: Int): Boolean {
+            return when {
+                !areaBlocked -> false
+                restrictedSide == "left" && col <= 6 -> true
+                restrictedSide == "right" && col >= 8 -> true
+                else -> false
+            }
+        }
+
         val placedPositions = pendingMoves.keys.mapNotNull { key ->
             val parts = key.split("-")
             if (parts.size == 2) {
@@ -500,16 +525,18 @@ class GameViewModel(
             } else null
         }
 
-        // 🚩 1. Hiç hamle yok, merkez boş → ilk hamle
+        // 🚩 1. İlk hamle
         if (pendingMoves.isEmpty()) {
             val centerTile = board["7-7"]
             if (centerTile?.letter.isNullOrEmpty()) {
-                newValidPositions.add(Position(7, 7))
+                if (!isBlocked(7)) {
+                    newValidPositions.add(Position(7, 7))
+                }
                 _validPositions.value = newValidPositions.toList()
                 return
             }
 
-            // 🚩 2. Tahtada harfler var ama kullanıcı harf koymamış
+            // 🚩 2. Tahtada harf var ama bu turda hamle yapılmamış
             for (row in 0..14) {
                 for (col in 0..14) {
                     val key = "$row-$col"
@@ -522,9 +549,8 @@ class GameViewModel(
                         for ((dr, dc) in directions) {
                             val nr = row + dr
                             val nc = col + dc
-                            if (nr in 0..14 && nc in 0..14) {
-                                val neighborKey = "$nr-$nc"
-                                val neighborTile = board[neighborKey]
+                            if (nr in 0..14 && nc in 0..14 && !isBlocked(nc)) {
+                                val neighborTile = board["$nr-$nc"]
                                 if (neighborTile?.letter.isNullOrEmpty()) {
                                     newValidPositions.add(Position(nr, nc))
                                 }
@@ -538,7 +564,7 @@ class GameViewModel(
             return
         }
 
-        // 🚩 3. Tek harf yerleştirildiyse → 8 yönde boş alanlara doğru ilerle
+        // 🚩 3. Tek harf
         if (placedPositions.size == 1) {
             val origin = placedPositions.first()
             val directions = listOf(
@@ -549,9 +575,8 @@ class GameViewModel(
             for ((dr, dc) in directions) {
                 var r = origin.row + dr
                 var c = origin.col + dc
-                while (r in 0..14 && c in 0..14) {
-                    val key = "$r-$c"
-                    val tile = board[key]
+                while (r in 0..14 && c in 0..14 && !isBlocked(c)) {
+                    val tile = board["$r-$c"]
                     if (tile?.letter.isNullOrEmpty()) {
                         newValidPositions.add(Position(r, c))
                         r += dr
@@ -564,7 +589,7 @@ class GameViewModel(
             return
         }
 
-        // 🚩 4. İki veya daha fazla harf konmuşsa → yön belirlenir
+        // 🚩 4. İki veya daha fazla harf
         val direction = detectDirection(placedPositions.toSet()) ?: return
         val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
 
@@ -578,9 +603,9 @@ class GameViewModel(
                 while (startCol > 0 && !board["$row-${startCol - 1}"]?.letter.isNullOrEmpty()) startCol--
                 while (endCol < 14 && !board["$row-${endCol + 1}"]?.letter.isNullOrEmpty()) endCol++
 
-                if (startCol > 0 && board["$row-${startCol - 1}"]?.letter.isNullOrEmpty() == true)
+                if (startCol > 0 && !isBlocked(startCol - 1) && board["$row-${startCol - 1}"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(Position(row, startCol - 1))
-                if (endCol < 14 && board["$row-${endCol + 1}"]?.letter.isNullOrEmpty() == true)
+                if (endCol < 14 && !isBlocked(endCol + 1) && board["$row-${endCol + 1}"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(Position(row, endCol + 1))
             }
 
@@ -593,35 +618,33 @@ class GameViewModel(
                 while (startRow > 0 && !board["${startRow - 1}-$col"]?.letter.isNullOrEmpty()) startRow--
                 while (endRow < 14 && !board["${endRow + 1}-$col"]?.letter.isNullOrEmpty()) endRow++
 
-                if (startRow > 0 && board["${startRow - 1}-$col"]?.letter.isNullOrEmpty() == true)
+                if (startRow > 0 && !isBlocked(col) && board["${startRow - 1}-$col"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(Position(startRow - 1, col))
-                if (endRow < 14 && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true)
+                if (endRow < 14 && !isBlocked(col) && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(Position(endRow + 1, col))
             }
 
             "diagonal-main", "diagonal-anti" -> {
                 val (dr, dc) = when (direction) {
-                    "diagonal-main" -> Pair(-1, -1)
-                    "diagonal-anti" -> Pair(-1, 1)
+                    "diagonal-main" -> -1 to -1
+                    "diagonal-anti" -> -1 to 1
                     else -> return
                 }
-                val (dr2, dc2) = Pair(-dr, -dc)
+                val (dr2, dc2) = -dr to -dc
 
                 var start = sorted.first()
                 var end = sorted.last()
 
                 while (true) {
                     val next = Position(start.row + dr, start.col + dc)
-                    val key = "${next.row}-${next.col}"
-                    if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                    if (next.row in 0..14 && next.col in 0..14 && !board["${next.row}-${next.col}"]?.letter.isNullOrEmpty()) {
                         start = next
                     } else break
                 }
 
                 while (true) {
                     val next = Position(end.row + dr2, end.col + dc2)
-                    val key = "${next.row}-${next.col}"
-                    if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                    if (next.row in 0..14 && next.col in 0..14 && !board["${next.row}-${next.col}"]?.letter.isNullOrEmpty()) {
                         end = next
                     } else break
                 }
@@ -629,9 +652,12 @@ class GameViewModel(
                 val before = Position(start.row + dr, start.col + dc)
                 val after = Position(end.row + dr2, end.col + dc2)
 
-                if (before.row in 0..14 && before.col in 0..14 && board["${before.row}-${before.col}"]?.letter.isNullOrEmpty() == true)
+                if (before.row in 0..14 && before.col in 0..14 &&
+                    !isBlocked(before.col) && board["${before.row}-${before.col}"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(before)
-                if (after.row in 0..14 && after.col in 0..14 && board["${after.row}-${after.col}"]?.letter.isNullOrEmpty() == true)
+
+                if (after.row in 0..14 && after.col in 0..14 &&
+                    !isBlocked(after.col) && board["${after.row}-${after.col}"]?.letter.isNullOrEmpty() == true)
                     newValidPositions.add(after)
             }
         }
@@ -643,6 +669,7 @@ class GameViewModel(
             println("Row: ${pos.row}, Col: ${pos.col}")
         }
     }
+
 
 
     private fun drawLetters(pool: MutableMap<String, Int>, count: Int): List<String> {
@@ -668,24 +695,59 @@ class GameViewModel(
         }
     }
 
-    // Method to activate letter freeze
-    fun activateLetterFreeze(letterIndices: List<Int>) {
+    fun activateLetterFreeze() {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
-            val targetPlayerId = if (currentGame.player1Id == currentUserId)
-                currentGame.player2Id else currentGame.player1Id
+            val userId = currentUserId ?: return@launch
 
-            repository.freezeLetters(currentGame.gameId, targetPlayerId, letterIndices)
+            val targetPlayerId = if (currentGame.player1Id == userId) {
+                currentGame.player2Id
+            } else {
+                currentGame.player1Id
+            }
+
+            val targetLetters = if (currentGame.player1Id == targetPlayerId) {
+                currentGame.currentLetters1
+            } else {
+                currentGame.currentLetters2
+            }
+
+            if (targetLetters.size >= 2) {
+                val indices = targetLetters.indices.shuffled().take(2)
+                repository.freezeLetters(currentGame.gameId, targetPlayerId, indices)
+            }
         }
     }
 
-    // Method to activate extra turn
+
+    fun clearExpiredFreezeEffects(game: Game): Game {
+        val currentPlayerId = game.currentTurnPlayerId
+        val currentTurnCount = game.moveHistory.count { it.playerId == currentPlayerId }
+
+        val newEffects = game.frozenLettersEffects.filterNot {
+            it.playerId == currentPlayerId && currentTurnCount >= it.clearTurn
+        }
+
+        return game.copy(frozenLettersEffects = newEffects)
+    }
+
+
     fun activateExtraTurn() {
         viewModelScope.launch {
             val currentGame = _game.value ?: return@launch
             val userId = currentUserId ?: return@launch
 
-            repository.setExtraTurn(currentGame.gameId, userId)
+            val currentTime = System.currentTimeMillis()
+            val newExpireTime = currentTime + (currentGame.duration.minutes * 60 * 1000)
+
+            val updatedGame = currentGame.copy(
+                extraTurnForPlayerId = userId,
+                startTimeMillis = currentTime,
+                expireTimeMillis = newExpireTime
+            )
+
+            repository.updateGame(updatedGame)
+            _game.value = updatedGame
         }
     }
 }

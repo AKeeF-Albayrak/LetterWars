@@ -136,13 +136,10 @@ class FireBaseGameDataSource(
                 "player1Score" to game.player1Score,
                 "player2Score" to game.player2Score,
                 "winnerId" to game.winnerId,
-                // Mayın ve Ödül sistemi için yeni alanlar
                 "areaBlockActivatedBy" to game.areaBlockActivatedBy,
                 "areaBlockSide" to game.areaBlockSide,
                 "areaBlockExpiresAt" to game.areaBlockExpiresAt,
-                "frozenLetterIndices" to game.frozenLetterIndices,
-                "frozenLettersPlayerId" to game.frozenLettersPlayerId,
-                "frozenLettersExpiresAt" to game.frozenLettersExpiresAt,
+                "frozenLettersEffects" to game.frozenLettersEffects,
                 "extraTurnForPlayerId" to game.extraTurnForPlayerId
             )
 
@@ -173,16 +170,6 @@ class FireBaseGameDataSource(
                                 areaBlockActivatedBy = null,
                                 areaBlockSide = null,
                                 areaBlockExpiresAt = null
-                            )
-                            needsUpdate = true
-                        }
-
-                        // Dondurulmuş harflerin süresini kontrol et
-                        if (game.frozenLettersExpiresAt != null && game.frozenLettersExpiresAt < currentTime) {
-                            updatedGame = updatedGame.copy(
-                                frozenLetterIndices = emptyList(),
-                                frozenLettersPlayerId = null,
-                                frozenLettersExpiresAt = null
                             )
                             needsUpdate = true
                         }
@@ -312,9 +299,6 @@ class FireBaseGameDataSource(
                 areaBlockActivatedBy = null,
                 areaBlockSide = null,
                 areaBlockExpiresAt = null,
-                frozenLetterIndices = emptyList(),
-                frozenLettersPlayerId = null,
-                frozenLettersExpiresAt = null,
                 extraTurnForPlayerId = null
             )
 

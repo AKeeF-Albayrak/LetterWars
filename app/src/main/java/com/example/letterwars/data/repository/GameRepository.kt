@@ -73,27 +73,20 @@ class GameRepository(
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Rakibin harflerini dondurur
-    suspend fun freezeLetters(gameId: String, targetPlayerId: String, letterIndices: List<Int>, duration: Long = 2 * 60 * 1000) {
+    suspend fun freezeLetters(gameId: String, targetPlayerId: String, letterIndices: List<Int>) {
         val game = gameDataSource.getGame(gameId) ?: return
-        val updatedGame = game.copy(
-            frozenLetterIndices = letterIndices,
-            frozenLettersPlayerId = targetPlayerId,
-            frozenLettersExpiresAt = System.currentTimeMillis() + duration
-        )
+
+        val clearTurn = game.moveHistory.count { it.playerId == targetPlayerId } + 1
+
+        val updatedEffects = game.frozenLettersEffects.toMutableList().apply {
+            add(FrozenLettersEffect(targetPlayerId, letterIndices, clearTurn))
+        }
+
+        val updatedGame = game.copy(frozenLettersEffects = updatedEffects)
+
         gameDataSource.updateGame(updatedGame)
     }
 
-    // Dondurulan harfleri çözer
-    suspend fun unfreezeLetters(gameId: String) {
-        val game = gameDataSource.getGame(gameId) ?: return
-        val updatedGame = game.copy(
-            frozenLetterIndices = emptyList(),
-            frozenLettersPlayerId = null,
-            frozenLettersExpiresAt = null
-        )
-        gameDataSource.updateGame(updatedGame)
-    }
 
     // Ekstra tur atar
     suspend fun setExtraTurn(gameId: String, playerId: String) {
@@ -247,16 +240,6 @@ class GameRepository(
                 areaBlockActivatedBy = null,
                 areaBlockSide = null,
                 areaBlockExpiresAt = null
-            )
-            needsUpdate = true
-        }
-
-        // Dondurulmuş harflerin süresini kontrol et
-        if (game.frozenLettersExpiresAt != null && game.frozenLettersExpiresAt < currentTime) {
-            updatedGame = updatedGame.copy(
-                frozenLetterIndices = emptyList(),
-                frozenLettersPlayerId = null,
-                frozenLettersExpiresAt = null
             )
             needsUpdate = true
         }
