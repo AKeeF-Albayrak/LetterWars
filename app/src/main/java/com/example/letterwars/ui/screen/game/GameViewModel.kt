@@ -193,7 +193,8 @@ class GameViewModel(
                     )
                 }
 
-                updatedBoard[key] = GameTile(letter = rackLetter.letter)
+                updatedBoard[key] = currentTile?.copy(letter = rackLetter.letter) ?: GameTile(letter = rackLetter.letter)
+
             }
 
             // Tetiklenen efektleri güncelle
@@ -488,16 +489,8 @@ class GameViewModel(
         val currentGame = _game.value ?: return
         val board = currentGame.board
         val pendingMoves = currentGame.pendingMoves
-        val newValidPositions = mutableListOf<Position>()
+        val newValidPositions = mutableSetOf<Position>()
 
-        val centerTileEmpty = board["7-7"]?.letter.isNullOrEmpty()
-        if (centerTileEmpty && pendingMoves.isEmpty()) {
-            newValidPositions.add(Position(7, 7))
-            _validPositions.value = newValidPositions
-            return
-        }
-
-        // pendingMoves üzerinden geçici taşlar
         val placedPositions = pendingMoves.keys.mapNotNull { key ->
             val parts = key.split("-")
             if (parts.size == 2) {
@@ -507,116 +500,150 @@ class GameViewModel(
             } else null
         }
 
-        if (placedPositions.size < 2) {
-            for (i in 0..14) {
-                for (j in 0..14) {
-                    val key = "$i-$j"
+        // 🚩 1. Hiç hamle yok, merkez boş → ilk hamle
+        if (pendingMoves.isEmpty()) {
+            val centerTile = board["7-7"]
+            if (centerTile?.letter.isNullOrEmpty()) {
+                newValidPositions.add(Position(7, 7))
+                _validPositions.value = newValidPositions.toList()
+                return
+            }
+
+            // 🚩 2. Tahtada harfler var ama kullanıcı harf koymamış
+            for (row in 0..14) {
+                for (col in 0..14) {
+                    val key = "$row-$col"
                     val tile = board[key]
-                    if (!tile?.letter.isNullOrEmpty()) continue
-                    if (i == 7 && j == 7) {
-                        newValidPositions.add(Position(i, j))
-                        continue
-                    }
-                    val neighborOffsets = listOf(
-                        -1 to 0, 1 to 0,
-                        0 to -1, 0 to 1,
-                        -1 to -1, 1 to 1,
-                        -1 to 1, 1 to -1
-                    )
-                    if (neighborOffsets.any { (dx, dy) ->
-                            val neighborKey = "${i + dx}-${j + dy}"
-                            board[neighborKey]?.letter?.isNotEmpty() == true
+                    if (!tile?.letter.isNullOrEmpty()) {
+                        val directions = listOf(
+                            -1 to 0, 1 to 0, 0 to -1, 0 to 1,
+                            -1 to -1, -1 to 1, 1 to -1, 1 to 1
+                        )
+                        for ((dr, dc) in directions) {
+                            val nr = row + dr
+                            val nc = col + dc
+                            if (nr in 0..14 && nc in 0..14) {
+                                val neighborKey = "$nr-$nc"
+                                val neighborTile = board[neighborKey]
+                                if (neighborTile?.letter.isNullOrEmpty()) {
+                                    newValidPositions.add(Position(nr, nc))
+                                }
+                            }
                         }
-                    ) {
-                        newValidPositions.add(Position(i, j))
                     }
                 }
             }
-        } else {
-            val direction = detectDirection(placedPositions.toSet()) ?: return
 
-            val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
+            _validPositions.value = newValidPositions.toList()
+            return
+        }
 
-            when (direction) {
-                "horizontal" -> {
-                    val row = sorted.first().row
-                    val cols = sorted.map { it.col }
-                    var startCol = cols.minOrNull() ?: 0
-                    var endCol = cols.maxOrNull() ?: 14
+        // 🚩 3. Tek harf yerleştirildiyse → 8 yönde boş alanlara doğru ilerle
+        if (placedPositions.size == 1) {
+            val origin = placedPositions.first()
+            val directions = listOf(
+                -1 to 0, 1 to 0, 0 to -1, 0 to 1,
+                -1 to -1, -1 to 1, 1 to -1, 1 to 1
+            )
 
-                    while (startCol > 0 && !board["$row-${startCol - 1}"]?.letter.isNullOrEmpty()) startCol--
-                    while (endCol < 14 && !board["$row-${endCol + 1}"]?.letter.isNullOrEmpty()) endCol++
+            for ((dr, dc) in directions) {
+                var r = origin.row + dr
+                var c = origin.col + dc
+                while (r in 0..14 && c in 0..14) {
+                    val key = "$r-$c"
+                    val tile = board[key]
+                    if (tile?.letter.isNullOrEmpty()) {
+                        newValidPositions.add(Position(r, c))
+                        r += dr
+                        c += dc
+                    } else break
+                }
+            }
 
-                    if (startCol > 0 && board["$row-${startCol - 1}"]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(Position(row, startCol - 1))
-                    if (endCol < 14 && board["$row-${endCol + 1}"]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(Position(row, endCol + 1))
+            _validPositions.value = newValidPositions.toList()
+            return
+        }
+
+        // 🚩 4. İki veya daha fazla harf konmuşsa → yön belirlenir
+        val direction = detectDirection(placedPositions.toSet()) ?: return
+        val sorted = placedPositions.sortedWith(compareBy({ it.row }, { it.col }))
+
+        when (direction) {
+            "horizontal" -> {
+                val row = sorted.first().row
+                val cols = sorted.map { it.col }
+                var startCol = cols.minOrNull() ?: 0
+                var endCol = cols.maxOrNull() ?: 14
+
+                while (startCol > 0 && !board["$row-${startCol - 1}"]?.letter.isNullOrEmpty()) startCol--
+                while (endCol < 14 && !board["$row-${endCol + 1}"]?.letter.isNullOrEmpty()) endCol++
+
+                if (startCol > 0 && board["$row-${startCol - 1}"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(Position(row, startCol - 1))
+                if (endCol < 14 && board["$row-${endCol + 1}"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(Position(row, endCol + 1))
+            }
+
+            "vertical" -> {
+                val col = sorted.first().col
+                val rows = sorted.map { it.row }
+                var startRow = rows.minOrNull() ?: 0
+                var endRow = rows.maxOrNull() ?: 14
+
+                while (startRow > 0 && !board["${startRow - 1}-$col"]?.letter.isNullOrEmpty()) startRow--
+                while (endRow < 14 && !board["${endRow + 1}-$col"]?.letter.isNullOrEmpty()) endRow++
+
+                if (startRow > 0 && board["${startRow - 1}-$col"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(Position(startRow - 1, col))
+                if (endRow < 14 && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(Position(endRow + 1, col))
+            }
+
+            "diagonal-main", "diagonal-anti" -> {
+                val (dr, dc) = when (direction) {
+                    "diagonal-main" -> Pair(-1, -1)
+                    "diagonal-anti" -> Pair(-1, 1)
+                    else -> return
+                }
+                val (dr2, dc2) = Pair(-dr, -dc)
+
+                var start = sorted.first()
+                var end = sorted.last()
+
+                while (true) {
+                    val next = Position(start.row + dr, start.col + dc)
+                    val key = "${next.row}-${next.col}"
+                    if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                        start = next
+                    } else break
                 }
 
-                "vertical" -> {
-                    val col = sorted.first().col
-                    val rows = sorted.map { it.row }
-                    var startRow = rows.minOrNull() ?: 0
-                    var endRow = rows.maxOrNull() ?: 14
-
-                    while (startRow > 0 && !board["${startRow - 1}-$col"]?.letter.isNullOrEmpty()) startRow--
-                    while (endRow < 14 && !board["${endRow + 1}-$col"]?.letter.isNullOrEmpty()) endRow++
-
-                    if (startRow > 0 && board["${startRow - 1}-$col"]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(Position(startRow - 1, col))
-                    if (endRow < 14 && board["${endRow + 1}-$col"]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(Position(endRow + 1, col))
+                while (true) {
+                    val next = Position(end.row + dr2, end.col + dc2)
+                    val key = "${next.row}-${next.col}"
+                    if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
+                        end = next
+                    } else break
                 }
-                "diagonal-main", "diagonal-anti" -> {
-                    val (dr, dc) = when (direction) {
-                        "diagonal-main" -> Pair(-1, -1)
-                        "diagonal-anti" -> Pair(-1, 1)
-                        else -> return
-                    }
-                    val (dr2, dc2) = Pair(-dr, -dc) // ters yön
 
-                    var start = sorted.first()
-                    var end = sorted.last()
+                val before = Position(start.row + dr, start.col + dc)
+                val after = Position(end.row + dr2, end.col + dc2)
 
-                    // Geriye doğru uzatma
-                    while (true) {
-                        val next = Position(start.row + dr, start.col + dc)
-                        val key = "${next.row}-${next.col}"
-                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
-                            start = next
-                        } else break
-                    }
-
-                    // İleriye doğru uzatma
-                    while (true) {
-                        val next = Position(end.row + dr2, end.col + dc2)
-                        val key = "${next.row}-${next.col}"
-                        if (next.row in 0..14 && next.col in 0..14 && !board[key]?.letter.isNullOrEmpty()) {
-                            end = next
-                        } else break
-                    }
-
-                    val before = Position(start.row + dr, start.col + dc)
-                    val after = Position(end.row + dr2, end.col + dc2)
-
-                    val beforeKey = "${before.row}-${before.col}"
-                    val afterKey = "${after.row}-${after.col}"
-
-                    if (before.row in 0..14 && before.col in 0..14 && board[beforeKey]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(before)
-                    if (after.row in 0..14 && after.col in 0..14 && board[afterKey]?.letter.isNullOrEmpty() == true)
-                        newValidPositions.add(after)
-                }
+                if (before.row in 0..14 && before.col in 0..14 && board["${before.row}-${before.col}"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(before)
+                if (after.row in 0..14 && after.col in 0..14 && board["${after.row}-${after.col}"]?.letter.isNullOrEmpty() == true)
+                    newValidPositions.add(after)
             }
         }
 
-        _validPositions.value = newValidPositions
+        _validPositions.value = newValidPositions.toList()
 
         println("Güncel Valid Positions (${newValidPositions.size} adet):")
         newValidPositions.forEach { pos ->
             println("Row: ${pos.row}, Col: ${pos.col}")
         }
     }
+
 
     private fun drawLetters(pool: MutableMap<String, Int>, count: Int): List<String> {
         val available = pool.flatMap { entry -> List(entry.value) { entry.key } }.toMutableList()
