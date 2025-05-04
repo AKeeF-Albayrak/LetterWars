@@ -573,21 +573,36 @@ class GameViewModel(
             )
 
             for ((dr, dc) in directions) {
-                var r = origin.row + dr
-                var c = origin.col + dc
-                while (r in 0..14 && c in 0..14 && !isBlocked(c)) {
-                    val tile = board["$r-$c"]
-                    if (tile?.letter.isNullOrEmpty()) {
-                        newValidPositions.add(Position(r, c))
-                        r += dr
-                        c += dc
+                var r = origin.row
+                var c = origin.col
+
+                // Önce bu yönde dolu harfler boyunca ilerle
+                while (true) {
+                    val nextR = r + dr
+                    val nextC = c + dc
+                    if (nextR !in 0..14 || nextC !in 0..14 || isBlocked(nextC)) break
+                    val tile = board["$nextR-$nextC"]
+                    if (!tile?.letter.isNullOrEmpty()) {
+                        r = nextR
+                        c = nextC
                     } else break
+                }
+
+                // İlk boş hücreye izin ver
+                val nextR = r + dr
+                val nextC = c + dc
+                if (nextR in 0..14 && nextC in 0..14 && !isBlocked(nextC)) {
+                    val tile = board["$nextR-$nextC"]
+                    if (tile?.letter.isNullOrEmpty() == true) {
+                        newValidPositions.add(Position(nextR, nextC))
+                    }
                 }
             }
 
             _validPositions.value = newValidPositions.toList()
             return
         }
+
 
         // 🚩 4. İki veya daha fazla harf
         val direction = detectDirection(placedPositions.toSet()) ?: return
