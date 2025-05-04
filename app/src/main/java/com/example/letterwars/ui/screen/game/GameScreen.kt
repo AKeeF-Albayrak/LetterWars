@@ -1183,21 +1183,33 @@
                     }
                 }
             }
+
             when {
                 placedLetter != null -> {
                     val isNewlyPlaced = placedLetters.containsKey(Position(row, col))
+                    // Daha canlı renkler kullanıyoruz
                     val letterBackgroundColor = if (isNewlyPlaced) {
-                        Color(0xFFA5D6A7) // Yeşil (bu turda konulan)
+                        Color(0xFF4CAF50) // Daha canlı yeşil (bu turda konulan)
                     } else {
-                        Color(0xFFFFF176) // Sarı (önceden olan)
+                        Color(0xFFFFB300) // Daha canlı sarı/turuncu (önceden olan)
                     }
 
+                    // Gölge ekliyoruz
                     Box(
                         modifier = Modifier
-                            .padding(1.dp)
+                            .padding(2.dp)
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(letterBackgroundColor),
+                            .shadow(
+                                elevation = 3.dp,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(letterBackgroundColor)
+                            .border(
+                                width = 1.dp,
+                                color = Color.Black.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(4.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -1206,29 +1218,65 @@
                             modifier = Modifier.fillMaxSize()
                         ) {
                             Text(
-                                text = placedLetter.letter,
-                                fontSize = 12.sp,
+                                text = placedLetter.letter.uppercase(),
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
+                                color = Color.White, // Beyaz metin rengi kontrast için
                                 textAlign = TextAlign.Center
+                            )
+
+                            // Puanı da gösteriyoruz
+                            Text(
+                                text = placedLetter.points.toString(),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.offset(y = (-2).dp)
                             )
                         }
                     }
                 }
 
                 !tile.letter.isNullOrEmpty() -> {
-                    Text(
-                        text = tile.letter,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
+                    // Daha önce yerleştirilmiş harf
+                    Box(
+                        modifier = Modifier
+                            .padding(2.dp)
+                            .fillMaxSize()
+                            .shadow(
+                                elevation = 2.dp,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFFF9800)) // Turuncu arka plan
+                            .border(
+                                width = 1.dp,
+                                color = Color.Black.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(4.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = tile.letter.uppercase(),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
+
                 else -> {
                     when (tile.cellType) {
-                        CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp)
-                        CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp)
-                        CellType.DOUBLE_WORD -> Text("2W", fontSize = 8.sp)
-                        CellType.TRIPLE_WORD -> Text("3W", fontSize = 8.sp)
+                        CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                        CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                        CellType.DOUBLE_WORD -> Text("2W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                        CellType.TRIPLE_WORD -> Text("3W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
                         else -> {}
                     }
                 }
@@ -1240,12 +1288,34 @@
 
                 val isValidTarget = validPlacementPositions.contains(Position(row, col))
 
+                // Geçerli hedef için bir pulse animasyonu ekleyelim
+                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 0.8f,
+                    targetValue = 1.2f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(800),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulse scale"
+                )
+
+                val alpha by infiniteTransition.animateFloat(
+                    initialValue = 0.5f,
+                    targetValue = 0.9f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(800),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "pulse alpha"
+                )
+
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(if (isValidTarget) 10.dp * scale else 8.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isValidTarget) Color.Green.copy(alpha = 0.7f)
+                            if (isValidTarget) Color.Green.copy(alpha = alpha)
                             else Color.Red.copy(alpha = 0.7f)
                         )
                 )
@@ -1318,12 +1388,19 @@
                                     }
                                 )
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color.Transparent)
-                                        .border(1.dp, Color.LightGray, RoundedCornerShape(6.dp))
+                                LetterTile(
+                                    letter = letter.letter,
+                                    points = letter.points,
+                                    isSelected = selectedLetter.value?.rackIndex == i,
+                                    isPlayerTurn = isPlayerTurn && !frozenIndices.contains(i),
+                                    onClick = {
+                                    },
+                                    onDragStart = { offset, position ->
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                    },
+                                    onDragEnd = {
+                                    }
                                 )
                             }
                         }

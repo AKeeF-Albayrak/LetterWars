@@ -252,12 +252,24 @@ class GameViewModel(
             val updatedPlayer1Score: Int
             val updatedPlayer2Score: Int
 
-            if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
-                updatedPlayer1Score = currentGame.player1Score + score
-                updatedPlayer2Score = currentGame.player2Score
+            val isPointTransfer = triggeredEffectsList.any { it.mineType == MineType.POINT_TRANSFER }
+
+            if (isPointTransfer) {
+                if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
+                    updatedPlayer1Score = currentGame.player1Score
+                    updatedPlayer2Score = currentGame.player2Score + score
+                } else {
+                    updatedPlayer1Score = currentGame.player1Score + score
+                    updatedPlayer2Score = currentGame.player2Score
+                }
             } else {
-                updatedPlayer1Score = currentGame.player1Score
-                updatedPlayer2Score = currentGame.player2Score + score
+                if (currentGame.currentTurnPlayerId == currentGame.player1Id) {
+                    updatedPlayer1Score = currentGame.player1Score + score
+                    updatedPlayer2Score = currentGame.player2Score
+                } else {
+                    updatedPlayer1Score = currentGame.player1Score
+                    updatedPlayer2Score = currentGame.player2Score + score
+                }
             }
 
 
