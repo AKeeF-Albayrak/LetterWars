@@ -170,19 +170,23 @@ private fun ProfileHeader(user: User) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Kullanıcı adı
+            // Kullanıcı adı - metni ortalı
             Text(
                 text = user.username,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF333333)
+                color = Color(0xFF333333),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Email
+            // Email - satırı ortalı
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
                     Icons.Default.Email,
@@ -194,7 +198,8 @@ private fun ProfileHeader(user: User) {
                 Text(
                     text = user.email,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF757575)
+                    color = Color(0xFF757575),
+                    textAlign = TextAlign.Center
                 )
             }
         }
