@@ -1139,18 +1139,18 @@
         onClick: () -> Unit
     ) {
         val backgroundColor = when (tile.cellType) {
-            CellType.NORMAL -> Color(0xFFF3E5F5)
+            CellType.NORMAL        -> Color(0xFFF3E5F5)
             CellType.DOUBLE_LETTER -> Color(0xFFAED6F1)
             CellType.TRIPLE_LETTER -> Color(0xFF5DADE2)
-            CellType.DOUBLE_WORD -> Color(0xFFF5CBA7)
-            CellType.TRIPLE_WORD -> Color(0xFFE59866)
-            CellType.CENTER -> Color(0xFFF9E79F)
+            CellType.DOUBLE_WORD   -> Color(0xFFF5CBA7)
+            CellType.TRIPLE_WORD   -> Color(0xFFE59866)
+            CellType.CENTER        -> Color(0xFFF9E79F)
         }
 
-        val isLetterSelected = LocalSelectedLetterExists.current || currentDragTargetCell == Position(row, col)
-        val isCenterCell = row == 7 && col == 7
+        // Tahta hücresinde harf var mı?
         val hasLetter = placedLetter != null || !tile.letter.isNullOrEmpty()
 
+        // Hücreyi çizen kutu
         Box(
             modifier = modifier
                 .padding(1.dp)
@@ -1159,159 +1159,76 @@
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            // Mine veya Reward ikonu
+            // 1) Mine / reward ikonları (harf yoksa)
             if (!hasLetter && (tile.mineType != null || tile.rewardType != null)) {
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .fillMaxSize()
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     when {
-                        tile.mineType != null -> {
-                            MineTypeIcon(
-                                type = tile.mineType,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        tile.rewardType != null -> {
-                            RewardTypeIcon(
-                                type = tile.rewardType,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        tile.mineType != null   ->
+                            MineTypeIcon(tile.mineType, modifier = Modifier.size(16.dp))
+                        tile.rewardType != null ->
+                            RewardTypeIcon(tile.rewardType, modifier = Modifier.size(16.dp))
                     }
                 }
             }
 
-            when {
-                placedLetter != null -> {
-                    val isNewlyPlaced = placedLetters.containsKey(Position(row, col))
-                    // Daha canlı renkler kullanıyoruz
-                    val letterBackgroundColor = if (isNewlyPlaced) {
-                        Color(0xFF4CAF50) // Daha canlı yeşil (bu turda konulan)
-                    } else {
-                        Color(0xFFFFB300) // Daha canlı sarı/turuncu (önceden olan)
-                    }
-
-                    // Gölge ekliyoruz
-                    Box(
-                        modifier = Modifier
-                            .padding(2.dp)
-                            .fillMaxSize()
-                            .shadow(
-                                elevation = 3.dp,
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(letterBackgroundColor)
-                            .border(
-                                width = 1.dp,
-                                color = Color.Black.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(4.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Text(
-                                text = placedLetter.letter.uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White, // Beyaz metin rengi kontrast için
-                                textAlign = TextAlign.Center
-                            )
-
-                            // Puanı da gösteriyoruz
-                            Text(
-                                text = placedLetter.points.toString(),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.offset(y = (-2).dp)
-                            )
-                        }
-                    }
-                }
-
-                !tile.letter.isNullOrEmpty() -> {
-                    // Daha önce yerleştirilmiş harf
-                    Box(
-                        modifier = Modifier
-                            .padding(2.dp)
-                            .fillMaxSize()
-                            .shadow(
-                                elevation = 2.dp,
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFFF9800)) // Turuncu arka plan
-                            .border(
-                                width = 1.dp,
-                                color = Color.Black.copy(alpha = 0.3f),
-                                shape = RoundedCornerShape(4.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = tile.letter.uppercase(),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                else -> {
-                    when (tile.cellType) {
-                        CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-                        CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-                        CellType.DOUBLE_WORD -> Text("2W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-                        CellType.TRIPLE_WORD -> Text("3W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-                        else -> {}
-                    }
-                }
-            }
-
-            // Sadece harf seçiliyse ve hücrede harf yoksa ve merkez hücre değilse nokta göster
-            if ((isLetterSelected || currentDragTargetCell == Position(row, col)) &&
-                !hasLetter && !isCenterCell) {
-
-                val isValidTarget = validPlacementPositions.contains(Position(row, col))
-
-                // Geçerli hedef için bir pulse animasyonu ekleyelim
-                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.8f,
-                    targetValue = 1.2f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(800),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulse scale"
-                )
-
-                val alpha by infiniteTransition.animateFloat(
-                    initialValue = 0.5f,
-                    targetValue = 0.9f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(800),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulse alpha"
-                )
-
+            // 2) Harf varsa: her zaman koyu renk metin, tam ortalanmış
+            if (hasLetter) {
                 Box(
-                    modifier = Modifier
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val letterChar = placedLetter?.letter ?: tile.letter!!
+                    Text(
+                        text = letterChar.uppercase(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF212121),   // koyu metin rengi
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                // 3) Hiç harf yoksa, bonus kısaltmaları
+                when (tile.cellType) {
+                    CellType.DOUBLE_LETTER -> Text("2L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                    CellType.TRIPLE_LETTER -> Text("3L", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                    CellType.DOUBLE_WORD   -> Text("2W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                    CellType.TRIPLE_WORD   -> Text("3W", fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+                    else                   -> { /* NORMAL veya CENTER zaten arkaplan rengiyle gösteriliyor */ }
+                }
+            }
+
+            // 4) Geçerli hamle noktası için pulse animasyonu
+            val isLetterSelected = LocalSelectedLetterExists.current ||
+                    currentDragTargetCell == Position(row, col)
+            val isCenterCell = row == 7 && col == 7
+            if ((isLetterSelected) &&
+                !hasLetter && !isCenterCell
+            ) {
+                val isValidTarget = validPlacementPositions.contains(Position(row, col))
+                val transition = rememberInfiniteTransition()
+                val scale by transition.animateFloat(
+                    initialValue = 0.8f,
+                    targetValue  = 1.2f,
+                    animationSpec = infiniteRepeatable(
+                        animation  = tween(800),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
+                val alpha by transition.animateFloat(
+                    initialValue = 0.5f,
+                    targetValue  = 0.9f,
+                    animationSpec = infiniteRepeatable(
+                        animation  = tween(800),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
+                Box(
+                    Modifier
                         .size(if (isValidTarget) 10.dp * scale else 8.dp)
                         .clip(CircleShape)
                         .background(
@@ -1322,6 +1239,7 @@
             }
         }
     }
+
 
     @Composable
     fun LetterRack(
